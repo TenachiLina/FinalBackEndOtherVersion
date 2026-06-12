@@ -1,20 +1,45 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { HydratedDocument } from 'mongoose';
 
-export type WorktimeDocument = Worktime & Document;
+export type WorktimeDocument = HydratedDocument<Worktime>;
 
 @Schema({ collection: 'worktime' })
 export class Worktime {
-  @Prop({ type: Types.ObjectId, ref: 'Employee' }) empId: Types.ObjectId;
-  @Prop({ type: Types.ObjectId, ref: 'Shift' }) shiftId: Types.ObjectId;
-  @Prop({ required: true }) workDate: Date;
-  @Prop({ default: '0' }) lateMinutes: string;
-  @Prop({ default: '0' }) overtimeMinutes: string;
-  @Prop({ default: '0' }) workHours: string;
-  @Prop() consomation: number;
-  @Prop({ default: 0 }) penalty: number;
-  @Prop({ default: false }) absent: boolean;
-  @Prop() absentComment: string;
+  @Prop()
+  worktime_id?: number;
+
+  @Prop()
+  emp_id?: number;
+
+  @Prop()
+  shift_id?: number;
+
+  @Prop({ required: true })
+  work_date!: Date;
+
+  @Prop({ default: '0' })
+  late_minutes?: string;
+
+  @Prop({ default: '0' })
+  overtime_minutes?: string;
+
+  @Prop({ default: '0' })
+  work_hours?: string;
+
+  @Prop()
+  consomation?: number;
+
+  @Prop({ default: 0 })
+  penalty?: number;
+
+  @Prop({ default: 0 })
+  bonus?: number;
+
+  @Prop({ default: false })
+  absent?: boolean;
+
+  @Prop()
+  absent_comment?: string;
 }
 
 export const WorktimeSchema = SchemaFactory.createForClass(Worktime);

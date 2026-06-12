@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Planning, PlanningDocument } from './planning.schema';
+import { Planning, PlanningDocument } from './planning.shema';
 
 @Injectable()
 export class PlanningService {
@@ -15,15 +15,15 @@ export class PlanningService {
     return this.planningModel.find().populate('shiftId').populate('empId').exec();
   }
 
-  async findOne(id: string): Promise<PlanningDocument> {
+  async findOne(id: string): Promise<PlanningDocument | null> {
     return this.planningModel.findById(id).populate('shiftId').populate('empId').exec();
   }
 
-  async update(id: string, data: Partial<Planning>): Promise<PlanningDocument> {
+  async update(id: string, data: Partial<Planning>): Promise<PlanningDocument|null> {
     return this.planningModel.findByIdAndUpdate(id, data, { new: true }).exec();
   }
 
-  async remove(id: string): Promise<PlanningDocument> {
+  async remove(id: string): Promise<PlanningDocument | null > {
     return this.planningModel.findByIdAndDelete(id).exec();
   }
 }
