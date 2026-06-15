@@ -1,5 +1,3 @@
-// planning.service.ts — replace your existing findAll with this version
-
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -17,19 +15,31 @@ export class PlanningService {
     const filter: Record<string, any> = {};
 
     if (query.planDate) {
-      // Match the whole day regardless of time component
-      const start = new Date(query.planDate);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(query.planDate);
-      end.setHours(23, 59, 59, 999);
+      const start = new Date(query.planDate); start.setHours(0, 0, 0, 0);
+      const end   = new Date(query.planDate); end.setHours(23, 59, 59, 999);
       filter.planDate = { $gte: start, $lte: end };
     }
 
-    return this.planningModel
-      .find(filter)
-      .populate('shiftId')
-      .populate('empId')
-      .exec();
+    return this.planningModel.find(filter).populate('shiftId').populate('empId').exec();
+  }
+
+  /** Delete all planning for the day then insert the new entries */
+  async bulkSave(entries: any[], planDate: string): Promise<PlanningDocument[]> {
+    const start = new Date(planDate); start.setHours(0, 0, 0, 0);
+    const end   = new Date(planDate); end.setHours(23, 59, 59, 999);
+
+    await this.planningModel.deleteMany({ planDate: { $gte: start, $lte: end } });
+
+    if (!entries.length) return [];
+
+    const docs = entries.map((e) => ({
+      shiftId:  e.shiftId,
+      empId:    e.empId,
+      taskId:   e.taskId,
+      planDate: new Date(e.planDate),
+    }));
+
+    return this.planningModel.insertMany(docs) as any;
   }
 
   async findOne(id: string): Promise<PlanningDocument | null> {
