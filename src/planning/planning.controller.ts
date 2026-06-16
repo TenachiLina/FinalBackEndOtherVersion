@@ -5,14 +5,15 @@ import { PlanningService } from './planning.service';
 export class PlanningController {
   constructor(private readonly planningService: PlanningService) {}
 
-  @Post('bulk')
-  async bulkSave(@Body() body: { entries: any[]; planDate: string }) {
-    return this.planningService.bulkSave(body.entries, body.planDate);
-  }
-
   @Post()
   create(@Body() body: any) {
     return this.planningService.create(body);
+  }
+
+  /** Save all planning entries for a date (replaces existing ones for that day) */
+  @Post('bulk')
+  async bulkSave(@Body() body: { entries: any[]; planDate: string }) {
+    return this.planningService.bulkSave(body.entries, body.planDate);
   }
 
   @Get()
