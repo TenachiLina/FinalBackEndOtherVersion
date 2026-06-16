@@ -5,8 +5,10 @@ export type PlanningDocument = Planning & Document;
 
 @Schema({ collection: 'planning' })
 export class Planning {
-  @Prop({ type: Types.ObjectId, ref: 'Shift', required: true }) shiftId!: Types.ObjectId;
-  @Prop({ type: Types.ObjectId, ref: 'Employee', required: true }) empId!: Types.ObjectId;
+  // @Prop({ type: Types.ObjectId, ref: 'Shift', required: true }) shiftId!: Types.ObjectId;
+  // @Prop({ type: Types.ObjectId, ref: 'Employee', required: true }) empId!: Types.ObjectId;
+  @Prop({ type: String, ref: 'Shift', required: true }) shiftId!: string;
+  @Prop({ type: String, ref: 'Employee', required: true }) empId!: string;
   @Prop({ required: true }) taskId!: number;
   @Prop({ required: true }) planDate!: Date;
   @Prop() customStartTime!: string;

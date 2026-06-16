@@ -17,8 +17,13 @@ export class PlanningController {
   }
 
   @Get()
-  findAll(@Query() query: any) {
-    return this.planningService.findAll(query);
+  async findAll(@Query() query: any) {
+    try {
+      return await this.planningService.findAll(query);
+    } catch (err) {
+      console.error('💀💀💀 findAll error:', err);
+      throw err;
+    }
   }
 
   @Get(':id')
