@@ -20,8 +20,7 @@ export class PlanningService {
       filter.planDate = { $gte: start, $lte: end };
     }
 
-    return this.planningModel.find(filter).exec();
-    // return this.planningModel.find(filter).populate('shiftId').populate('empId').exec();
+    return this.planningModel.find(filter).populate('shiftId').populate('empId').exec();
   }
 
   /** Delete all planning for the day then insert the new entries */
@@ -44,8 +43,7 @@ export class PlanningService {
   }
 
   async findOne(id: string): Promise<PlanningDocument | null> {
-    return this.planningModel.findById(id).exec();
-    // return this.planningModel.findById(id).populate('shiftId').populate('empId').exec();
+    return this.planningModel.findById(id).populate('shiftId').populate('empId').exec();
   }
 
   async update(id: string, data: Partial<Planning>): Promise<PlanningDocument | null> {
