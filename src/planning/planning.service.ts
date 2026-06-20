@@ -23,23 +23,90 @@ export class PlanningService {
     return this.planningModel.find(filter).populate('shiftId').populate('empId').exec();
   }
 
-  /** Delete all planning for the day then insert the new entries */
-  async bulkSave(entries: any[], planDate: string): Promise<PlanningDocument[]> {
-    const start = new Date(planDate); start.setHours(0, 0, 0, 0);
-    const end   = new Date(planDate); end.setHours(23, 59, 59, 999);
+  // /** Keep existing planning entries in the database.
+  //     Add only new entries.
+  //     Avoid deleting all planning for the day.
+  //  */
+  // async bulkSave(entries: any[], planDate: string): Promise<PlanningDocument[]> {
+  //   const inserted: PlanningDocument[] = [];
 
-    await this.planningModel.deleteMany({ planDate: { $gte: start, $lte: end } });
+  //   for (const entry of entries) {
+  //     const exists = await this.planningModel.findOne({
+  //       planDate: new Date(entry.planDate),
+  //       shiftId: entry.shiftId,
+  //       empId: entry.empId,
+  //       taskId: entry.taskId,
+  //     });
 
-    if (!entries.length) return [];
+  //     if (!exists) {
+  //       const doc = await this.planningModel.create({
+  //         shiftId: entry.shiftId,
+  //         empId: entry.empId,
+  //         taskId: entry.taskId,
+  //         planDate: new Date(entry.planDate),
+  //       });
 
-    const docs = entries.map((e) => ({
-      shiftId:  e.shiftId,
-      empId:    e.empId,
-      taskId:   e.taskId,
-      planDate: new Date(e.planDate),
-    }));
+  //       inserted.push(doc);
+  //     }
+  //   }
 
-    return this.planningModel.insertMany(docs) as any;
+  //   return inserted;
+  // }
+
+  async bulkSave(
+  entries: any[],
+  planDate: string,
+  replaceExisting = false,
+  ): Promise<PlanningDocument[]> {
+
+    const start = new Date(planDate);
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date(planDate);
+    end.setHours(23, 59, 59, 999);
+
+    // Mode 1: Replace existing planning
+    if (replaceExisting) {
+      await this.planningModel.deleteMany({
+        planDate: { $gte: start, $lte: end },
+      });
+
+      if (!entries.length) return [];
+
+      const docs = entries.map((e) => ({
+        shiftId: e.shiftId,
+        empId: e.empId,
+        taskId: e.taskId,
+        planDate: new Date(e.planDate),
+      }));
+
+      return this.planningModel.insertMany(docs) as any;
+    }
+
+    // Mode 2: Append only new entries
+    const inserted: PlanningDocument[] = [];
+
+    for (const entry of entries) {
+      const exists = await this.planningModel.findOne({
+        planDate: { $gte: start, $lte: end },
+        shiftId: entry.shiftId,
+        empId: entry.empId,
+        taskId: entry.taskId,
+      });
+
+      if (!exists) {
+        const doc = await this.planningModel.create({
+          shiftId: entry.shiftId,
+          empId: entry.empId,
+          taskId: entry.taskId,
+          planDate: new Date(entry.planDate),
+        });
+
+        inserted.push(doc);
+      }
+    }
+
+    return inserted;
   }
 
   async findOne(id: string): Promise<PlanningDocument | null> {
