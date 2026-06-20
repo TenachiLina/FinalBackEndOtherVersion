@@ -11,24 +11,9 @@ export class PlanningController {
   }
 
   /** Save all planning entries for a date (replaces existing ones for that day) */
-  // @Post('bulk')
-  // async bulkSave(@Body() body: { entries: any[]; planDate: string }) {
-  //   return this.planningService.bulkSave(body.entries, body.planDate);
-  // }
   @Post('bulk')
-  async bulkSave(
-    @Body()
-    body: {
-      entries: any[];
-      planDate: string;
-      replaceExisting?: boolean;
-    },
-  ) {
-    return this.planningService.bulkSave(
-      body.entries,
-      body.planDate,
-      body.replaceExisting ?? false,
-    );
+  async bulkSave(@Body() body: { entries: any[]; planDate: string }) {
+    return this.planningService.bulkSave(body.entries, body.planDate);
   }
 
   @Get()

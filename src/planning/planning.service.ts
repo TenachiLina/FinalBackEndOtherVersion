@@ -53,62 +53,19 @@ export class PlanningService {
   //   return inserted;
   // }
 
-  async bulkSave(
-  entries: any[],
-  planDate: string,
-  replaceExisting = false,
-  ): Promise<PlanningDocument[]> {
-
-    const start = new Date(planDate);
-    start.setHours(0, 0, 0, 0);
-
-    const end = new Date(planDate);
-    end.setHours(23, 59, 59, 999);
-
-    // Mode 1: Replace existing planning
-    if (replaceExisting) {
-      await this.planningModel.deleteMany({
-        planDate: { $gte: start, $lte: end },
-      });
-
-      if (!entries.length) return [];
-
-      const docs = entries.map((e) => ({
-        shiftId: e.shiftId,
-        empId: e.empId,
-        taskId: e.taskId,
-        planDate: new Date(e.planDate),
-      }));
-
-      return this.planningModel.insertMany(docs) as any;
-    }
-
-    // Mode 2: Append only new entries
-    const inserted: PlanningDocument[] = [];
-
-    for (const entry of entries) {
-      const exists = await this.planningModel.findOne({
-        planDate: { $gte: start, $lte: end },
-        shiftId: entry.shiftId,
-        empId: entry.empId,
-        taskId: entry.taskId,
-      });
-
-      if (!exists) {
-        const doc = await this.planningModel.create({
-          shiftId: entry.shiftId,
-          empId: entry.empId,
-          taskId: entry.taskId,
-          planDate: new Date(entry.planDate),
-        });
-
-        inserted.push(doc);
-      }
-    }
-
-    return inserted;
+  //Delete old entries and insert new ones for the day. This is simpler and avoids duplicates.
+  async bulkSave(entries: any[], planDate: string): Promise<PlanningDocument[]> 
+  { 
+    const start = new Date(planDate); 
+    start.setHours(0, 0, 0, 0); 
+    const end = new Date(planDate); 
+    end.setHours(23, 59, 59, 999); 
+    await this.planningModel.deleteMany({ planDate: { $gte: start, $lte: end } }); 
+    if (!entries.length) return []; 
+    const docs = entries.map((e) => (
+      { shiftId: e.shiftId, empId: e.empId, taskId: e.taskId, planDate: new Date(e.planDate), })); 
+      return this.planningModel.insertMany(docs) as any; 
   }
-
   async findOne(id: string): Promise<PlanningDocument | null> {
     return this.planningModel.findById(id).populate('shiftId').populate('empId').exec();
   }
