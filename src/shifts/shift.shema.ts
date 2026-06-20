@@ -7,6 +7,7 @@ export type ShiftDocument = Shift & Document;
 export class Shift {
   @Prop({ required: true }) startTime!: string;
   @Prop({ required: true }) endTime!: string;
+  @Prop({ default: false }) isArchived!: boolean;
 }
 
 export const ShiftSchema = SchemaFactory.createForClass(Shift);
