@@ -54,18 +54,37 @@ export class PlanningService {
   // }
 
   //Delete old entries and insert new ones for the day. This is simpler and avoids duplicates.
-  async bulkSave(entries: any[], planDate: string): Promise<PlanningDocument[]> 
-  { 
-    const start = new Date(planDate); 
-    start.setHours(0, 0, 0, 0); 
-    const end = new Date(planDate); 
-    end.setHours(23, 59, 59, 999); 
-    await this.planningModel.deleteMany({ planDate: { $gte: start, $lte: end } }); 
-    if (!entries.length) return []; 
-    const docs = entries.map((e) => (
-      { shiftId: e.shiftId, empId: e.empId, taskId: e.taskId, planDate: new Date(e.planDate), })); 
-      return this.planningModel.insertMany(docs) as any; 
+  // async bulkSave(entries: any[], planDate: string): Promise<PlanningDocument[]> 
+  // { 
+  //   const start = new Date(planDate); 
+  //   start.setHours(0, 0, 0, 0); 
+  //   const end = new Date(planDate); 
+  //   end.setHours(23, 59, 59, 999); 
+  //   await this.planningModel.deleteMany({ planDate: { $gte: start, $lte: end } }); 
+  //   if (!entries.length) return []; 
+  //   const docs = entries.map((e) => (
+  //     { shiftId: e.shiftId, empId: e.empId, taskId: e.taskId, planDate: new Date(e.planDate), })); 
+  //     return this.planningModel.insertMany(docs) as any; 
+  // }
+
+  async bulkSave(entries: any[], planDate: string): Promise<PlanningDocument[]>
+  {
+    const start = new Date(planDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(planDate);
+    end.setHours(23, 59, 59, 999);
+    await this.planningModel.deleteMany({ planDate: { $gte: start, $lte: end } });
+    if (!entries.length) return [];
+    const docs = entries.map((e) => ({
+      shiftId: e.shiftId,
+      empId: e.empId,
+      taskId: e.taskId,
+      planDate: new Date(e.planDate),
+      tasks: e.tasks ?? [],
+    }));
+    return this.planningModel.insertMany(docs) as any;
   }
+
   async findOne(id: string): Promise<PlanningDocument | null> {
     return this.planningModel.findById(id).populate('shiftId').populate('empId').exec();
   }
