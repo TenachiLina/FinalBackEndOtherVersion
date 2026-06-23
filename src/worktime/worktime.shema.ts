@@ -12,7 +12,8 @@ export class Worktime {
   emp_id?: number;
 
   @Prop()
-  shift_id?: number;
+@Prop()
+shift_id?: string;   // ← change from number to string
 
   @Prop({ required: true })
   work_date!: Date;

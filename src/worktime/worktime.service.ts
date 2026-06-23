@@ -10,13 +10,22 @@ export class WorktimeService {
   async create(data: Partial<Worktime>): Promise<WorktimeDocument> {
     return this.worktimeModel.create(data);
   }
-
- async findAll(query: Record<string, any> = {}): Promise<WorktimeDocument[]> {
+async findAll(query: Record<string, any> = {}): Promise<WorktimeDocument[]> {
   const filter: Record<string, any> = {};
 
-  if (query.emp_id)    filter.emp_id   = Number(query.emp_id);
-  if (query.shift_id)  filter.shift_id = Number(query.shift_id);
-  if (query.work_date) filter.work_date = new Date(query.work_date);
+  if (query.emp_id) {
+    const n = Number(query.emp_id);
+    if (!isNaN(n)) filter.emp_id = n;
+  }
+  if (query.shift_id) {
+    const n = Number(query.shift_id);
+    if (!isNaN(n)) filter.shift_id = n;  // only add if it's actually a number
+  }
+  if (query.work_date) {
+    const start = new Date(query.work_date); start.setHours(0, 0, 0, 0);
+    const end   = new Date(query.work_date); end.setHours(23, 59, 59, 999);
+    filter.work_date = { $gte: start, $lte: end };
+  }
 
   return this.worktimeModel.find(filter).exec();
 }
