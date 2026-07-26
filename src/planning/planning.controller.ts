@@ -1,5 +1,17 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Param,
+  Body,
+  Query,
+  Res,
+} from '@nestjs/common';
 import { PlanningService } from './planning.service';
+import type { Response } from "express";
+
 
 @Controller('planning')
 export class PlanningController {
@@ -24,6 +36,45 @@ export class PlanningController {
       console.error('💀💀💀 findAll error:', err);
       throw err;
     }
+  }
+
+  @Get('import/:date')
+  async importFromDate(@Param('date') date: string) {
+    return this.planningService.importFromDate(date);
+  }
+  
+  @Get("export-first-week")
+  async exportFirstWeek(
+    @Query("year") year: string,
+    @Query("month") month: string,
+    @Query("format") format: string,
+    @Res() res: Response,
+  ) {
+    if (format === "pdf") {
+      return this.planningService.exportFirstWeekPdf(
+        Number(year),
+        Number(month),
+        res,
+      );
+    }
+
+    const workbook = await this.planningService.exportFirstWeek(
+      Number(year),
+      Number(month),
+    );
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="WeeklyPlanning.xlsx"',
+    );
+
+    await workbook.xlsx.write(res);
+    res.end();
   }
 
   @Get(':id')
