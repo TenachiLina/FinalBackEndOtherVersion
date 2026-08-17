@@ -32,13 +32,30 @@ export const PlanningTaskSchema = SchemaFactory.createForClass(PlanningTask);
 
 @Schema({ collection: 'planning' })
 export class Planning {
-  @Prop({ type: String, ref: 'Shift', required: true }) shiftId!: string;
-  @Prop({ type: String, ref: 'Employee', required: true }) empId!: string;
-  @Prop({ required: true }) taskId!: number;
-  @Prop({ required: true }) planDate!: Date;
-  @Prop({ type: [PlanningTaskSchema], default: [] }) tasks!: PlanningTask[];
-  @Prop() customStartTime?: string;
-  @Prop() customEndTime?: string;
+
+  @Prop({ type: String, ref: 'Shift', required: true })
+  shiftId!: string;
+
+  @Prop({ type: String, ref: 'Employee', required: true })
+  empId!: string;
+
+  @Prop({ type: String, ref: 'Employee', default: null })
+  backupEmpId?: string | null;
+
+  @Prop({ required: true })
+  taskId!: number;
+
+  @Prop({ required: true })
+  planDate!: Date;
+
+  @Prop({ type: [PlanningTaskSchema], default: [] })
+  tasks!: PlanningTask[];
+
+  @Prop()
+  customStartTime?: string;
+
+  @Prop()
+  customEndTime?: string;
 }
 
 export const PlanningSchema = SchemaFactory.createForClass(Planning);
