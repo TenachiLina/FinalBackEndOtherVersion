@@ -77,6 +77,47 @@ export class PlanningController {
     res.end();
   }
 
+  @Get("export-current-day")
+  async exportCurrentDay(
+    @Query("year") year: string,
+    @Query("month") month: string,
+    @Query("day") day: string,
+    @Query("format") format: string,
+    @Res() res: Response,
+  ) {
+     
+    console.log("Exporting current day with format:", format, "for date:", year, month, day);
+    if (format === "pdf") {
+
+      return this.planningService.exportCurrentDayPdf(
+        Number(year),
+        Number(month),
+        Number(day),
+        res,
+      );
+    }
+
+    const workbook =
+      await this.planningService.exportCurrentDay(
+        Number(year),
+        Number(month),
+        Number(day),
+      );
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="DailyPlanning.xlsx"`,
+    );
+
+    await workbook.xlsx.write(res);
+
+    res.end();
+  }
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.planningService.findOne(id);
