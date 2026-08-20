@@ -1,4 +1,9 @@
-import { Controller, Get, Post, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { AttendanceService } from './attendance.service';
 
 @Controller('attendance')
@@ -11,12 +16,14 @@ export class AttendanceController {
   async sync() {
     try {
       await this.attendanceService.syncLogs();
+
       return {
         status: 'success',
         message: 'Sync completed',
       };
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message =
+        err instanceof Error ? err.message : String(err);
 
       return {
         status: 'error',
@@ -26,7 +33,29 @@ export class AttendanceController {
   }
 
   @Get('device-logs')
-  async getDeviceLogs(@Query('date') date?: string) {
-    return this.attendanceService.getDeviceLogs(date);
+async getDeviceLogs(
+  @Query('from') from?: string,
+  @Query('to') to?: string,
+) {
+  try {
+    const logs = await this.attendanceService.getLogsByDateRange(
+      from,
+      to,
+    );
+
+    return {
+      status: 'success',
+      count: logs.length,
+      data: logs,
+    };
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : String(err);
+
+    return {
+      status: 'error',
+      message,
+    };
   }
+}
 }
