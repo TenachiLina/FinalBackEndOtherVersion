@@ -29,6 +29,10 @@ export class AttendanceDeviceController {
     }
   }
 
+  @Get('status')
+async getStatus() {
+  return this.deviceService.getDeviceStatus();
+}
   @Get('logs')
   async getLogs() {
     try {
