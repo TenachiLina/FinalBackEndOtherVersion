@@ -132,4 +132,18 @@ export class PlanningController {
   remove(@Param('id') id: string) {
     return this.planningService.remove(id);
   }
+
+  @Post("copy-month")
+  async copyMonth(
+    @Body()
+    body: {
+      sourceMonth: string;
+      destinationMonth: string;
+    },
+  ) {
+    return this.planningService.copyMonth(
+      body.sourceMonth,
+      body.destinationMonth,
+    );
+  }
 }

@@ -425,7 +425,7 @@ export class PlanningService {
 
     const headerFontSize = 9;
 
-    // Smaller font for employees
+    // Employee font
     const employeeFontSize = 6.5;
 
     const hourFontSize = 8;
@@ -443,10 +443,69 @@ export class PlanningService {
     const cellPadding = 5;
 
     // ==================================================
+    // MONTH DATE RANGE
+    // ==================================================
+
+    /*
+    * IMPORTANT:
+    *
+    * JavaScript months are 0-based:
+    *
+    * January  = 0
+    * February = 1
+    * ...
+    * August   = 7
+    * September = 8
+    *
+    * Therefore:
+    *
+    * new Date(year, month, 1)
+    * new Date(year, month + 1, 0)
+    *
+    * correctly gives the first and last day
+    * of the requested month.
+    */
+
+    const firstDayOfMonth =
+      new Date(year, month, 1);
+
+    const lastDayOfMonth =
+      new Date(year, month + 1, 0);
+
+    /*
+    * Use numeric date formatting here.
+    *
+    * This avoids timezone-related problems that can
+    * accidentally move the date to the previous/next day.
+    */
+
+    const monthName =
+      firstDayOfMonth.toLocaleDateString(
+        "en-US",
+        {
+          month: "long",
+        },
+      );
+
+    const firstDayNumber =
+      firstDayOfMonth.getDate();
+
+    const lastDayNumber =
+      lastDayOfMonth.getDate();
+
+    const dateRangeText =
+      `From: ${firstDayNumber} ${monthName} ${year} ` +
+      `to ${lastDayNumber} ${monthName} ${year}`;
+
+    // ==================================================
     // DRAW TITLE
     // ==================================================
 
     const drawTitle = () => {
+
+      // ------------------------------------------------
+      // Main title
+      // ------------------------------------------------
 
       doc
         .font("Helvetica-Bold")
@@ -454,7 +513,24 @@ export class PlanningService {
         .text(
           "First Week Planning",
           0,
-          20,
+          15,
+          {
+            align: "center",
+            width: pageWidth,
+          },
+        );
+
+      // ------------------------------------------------
+      // Date range
+      // ------------------------------------------------
+
+      doc
+        .font("Helvetica")
+        .fontSize(9)
+        .text(
+          dateRangeText,
+          0,
+          38,
           {
             align: "center",
             width: pageWidth,
@@ -529,12 +605,249 @@ export class PlanningService {
     };
 
     // ==================================================
+    // GET EMPLOYEE / BACKUP PARTS
+    // ==================================================
+
+    /*
+    * The PDF data is expected to contain employees
+    * like:
+    *
+    * John Smith
+    * (Backup: Ahmed Ali)
+    *
+    * Main employee will be displayed in BOLD.
+    *
+    * Backup will be displayed in NORMAL font.
+    */
+
+    const getEmployeeParts = (employee: string) => {
+
+      const backupMatch =
+        employee.match(
+          /\(Backup:\s*(.*?)\)/i,
+        );
+
+      if (!backupMatch) {
+
+        return {
+          main: employee,
+          backup: null,
+        };
+      }
+
+      const main =
+        employee
+          .replace(
+            backupMatch[0],
+            "",
+          )
+          .trim();
+
+      const backup =
+        `Backup: ${backupMatch[1].trim()}`;
+
+      return {
+        main,
+        backup,
+      };
+    };
+
+    // ==================================================
+    // CALCULATE EMPLOYEE TEXT HEIGHT
+    // ==================================================
+
+    const calculateEmployeeHeight = (
+      employees: string[],
+    ) => {
+
+      let totalHeight = 0;
+
+      employees.forEach((employee) => {
+
+        const {
+          main,
+          backup,
+        } = getEmployeeParts(employee);
+
+        // ----------------------------------------------
+        // Main employee
+        // ----------------------------------------------
+
+        doc
+          .font("Helvetica-Bold")
+          .fontSize(employeeFontSize);
+
+        totalHeight +=
+          doc.heightOfString(
+            main,
+            {
+              width:
+                dayWidth -
+                cellPadding * 2,
+
+              lineGap: 0,
+            },
+          );
+
+        // ----------------------------------------------
+        // Backup employee
+        // ----------------------------------------------
+
+        if (backup) {
+
+          doc
+            .font("Helvetica")
+            .fontSize(employeeFontSize);
+
+          totalHeight +=
+            doc.heightOfString(
+              backup,
+              {
+                width:
+                  dayWidth -
+                  cellPadding * 2,
+
+                lineGap: 0,
+              },
+            );
+        }
+      });
+
+      return totalHeight;
+    };
+
+    // ==================================================
+    // DRAW EMPLOYEES
+    // ==================================================
+
+    const drawEmployees = (
+      employees: string[],
+      x: number,
+      y: number,
+      availableHeight: number,
+    ) => {
+
+      if (employees.length === 0) {
+        return;
+      }
+
+      const totalHeight =
+        calculateEmployeeHeight(
+          employees,
+        );
+
+      // Vertically center employees
+      let textY =
+        y +
+        Math.max(
+          cellPadding,
+          (availableHeight -
+            totalHeight) / 2,
+        );
+
+      employees.forEach((employee) => {
+
+        const {
+          main,
+          backup,
+        } = getEmployeeParts(employee);
+
+        // ==================================================
+        // MAIN EMPLOYEE — BOLD
+        // ==================================================
+
+        doc
+          .font("Helvetica-Bold")
+          .fontSize(employeeFontSize);
+
+        const mainHeight =
+          doc.heightOfString(
+            main,
+            {
+              width:
+                dayWidth -
+                cellPadding * 2,
+
+              lineGap: 0,
+            },
+          );
+
+        doc.text(
+          main,
+          x + cellPadding,
+          textY,
+          {
+            width:
+              dayWidth -
+              cellPadding * 2,
+
+            align: "center",
+
+            lineGap: 0,
+          },
+        );
+
+        textY += mainHeight;
+
+        // ==================================================
+        // BACKUP EMPLOYEE — NORMAL
+        // ==================================================
+
+        if (backup) {
+
+          doc
+            .font("Helvetica")
+            .fontSize(employeeFontSize);
+
+          const backupHeight =
+            doc.heightOfString(
+              backup,
+              {
+                width:
+                  dayWidth -
+                  cellPadding * 2,
+
+                lineGap: 0,
+              },
+            );
+
+          doc.text(
+            backup,
+            x + cellPadding,
+            textY,
+            {
+              width:
+                dayWidth -
+                cellPadding * 2,
+
+              align: "center",
+
+              lineGap: 0,
+            },
+          );
+
+          textY += backupHeight;
+        }
+      });
+    };
+
+    // ==================================================
     // TITLE + FIRST HEADER
     // ==================================================
 
     drawTitle();
 
-    let currentY = 55;
+    /*
+    * Title:
+    *      First Week Planning
+    *
+    * Date:
+    *      From: 1 August 2026 to 31 August 2026
+    *
+    * Therefore table starts below both.
+    */
+
+    let currentY = 62;
 
     drawHeader(currentY);
 
@@ -547,7 +860,7 @@ export class PlanningService {
     hours.forEach((hour) => {
 
       // ------------------------------------------------
-      // Calculate the required height for this row
+      // Calculate required row height
       // ------------------------------------------------
 
       let requiredRowHeight =
@@ -558,29 +871,15 @@ export class PlanningService {
         const employees =
           weekGrid[day]?.[hour] ?? [];
 
-        const employeeText =
-          employees.join("\n");
-
-        if (!employeeText) {
+        if (employees.length === 0) {
           return;
         }
 
-        // Calculate how much vertical space
-        // this cell actually needs.
+        // Calculate employee + backup height
         const textHeight =
-          doc
-            .font("Helvetica")
-            .fontSize(employeeFontSize)
-            .heightOfString(
-              employeeText,
-              {
-                width:
-                  dayWidth -
-                  cellPadding * 2,
-
-                lineGap: 0,
-              },
-            );
+          calculateEmployeeHeight(
+            employees,
+          );
 
         const cellHeight =
           textHeight +
@@ -590,6 +889,7 @@ export class PlanningService {
           cellHeight >
           requiredRowHeight
         ) {
+
           requiredRowHeight =
             cellHeight;
         }
@@ -605,21 +905,25 @@ export class PlanningService {
         pageHeight - margin
       ) {
 
-        // New page
+        // ==================================================
+        // NEW PAGE
+        // ==================================================
+
         doc.addPage();
 
+        // Draw title and date again
         drawTitle();
 
-        currentY = 55;
+        currentY = 62;
 
         drawHeader(currentY);
 
         currentY += headerHeight;
       }
 
-      // ------------------------------------------------
-      // Draw hour cell
-      // ------------------------------------------------
+      // ==================================================
+      // DRAW HOUR CELL
+      // ==================================================
 
       doc
         .font("Helvetica")
@@ -646,16 +950,19 @@ export class PlanningService {
         },
       );
 
-      // ------------------------------------------------
-      // Draw employee cells
-      // ------------------------------------------------
+      // ==================================================
+      // DRAW EMPLOYEE CELLS
+      // ==================================================
 
       let x =
         startX + hourWidth;
 
       weekDays.forEach((day) => {
 
+        // ------------------------------------------------
         // Cell border
+        // ------------------------------------------------
+
         doc
           .rect(
             x,
@@ -665,57 +972,20 @@ export class PlanningService {
           )
           .stroke();
 
+        // ------------------------------------------------
         // Employees
+        // ------------------------------------------------
+
         const employees =
           weekGrid[day]?.[hour] ?? [];
 
-        const employeeText =
-          employees.join("\n");
+        if (employees.length > 0) {
 
-        if (employeeText) {
-
-          doc
-            .font("Helvetica")
-            .fontSize(employeeFontSize);
-
-          const textHeight =
-            doc.heightOfString(
-              employeeText,
-              {
-                width:
-                  dayWidth -
-                  cellPadding * 2,
-
-                lineGap: 0,
-              },
-            );
-
-          // Vertically center the text
-          const textY =
-            currentY +
-            Math.max(
-              cellPadding,
-              (requiredRowHeight -
-                textHeight) / 2,
-            );
-
-          doc.text(
-            employeeText,
-            x + cellPadding,
-            textY,
-            {
-              width:
-                dayWidth -
-                cellPadding * 2,
-
-              height:
-                requiredRowHeight -
-                cellPadding * 2,
-
-              align: "center",
-
-              lineGap: 0,
-            },
+          drawEmployees(
+            employees,
+            x,
+            currentY,
+            requiredRowHeight,
           );
         }
 
@@ -1233,5 +1503,356 @@ export class PlanningService {
 
     async remove(id: string): Promise<PlanningDocument | null> {
       return this.planningModel.findByIdAndDelete(id).exec();
+    }
+
+    async copyMonth(
+      sourceMonth: string,
+      destinationMonth: string,
+    ) {
+      const [sourceYear, sourceMonthNumber] =
+        sourceMonth.split("-").map(Number);
+
+      const [destinationYear, destinationMonthNumber] =
+        destinationMonth.split("-").map(Number);
+
+      // ==================================================
+      // SOURCE MONTH RANGE
+      // ==================================================
+
+      const sourceStart = new Date(
+        Date.UTC(
+          sourceYear,
+          sourceMonthNumber - 1,
+          1,
+          0,
+          0,
+          0,
+          0,
+        ),
+      );
+
+      const sourceEnd = new Date(
+        Date.UTC(
+          sourceYear,
+          sourceMonthNumber,
+          0,
+          23,
+          59,
+          59,
+          999,
+        ),
+      );
+
+      // ==================================================
+      // GET SOURCE PLANNING
+      // ==================================================
+
+      const sourcePlanning = await this.planningModel
+        .find({
+          planDate: {
+            $gte: sourceStart,
+            $lte: sourceEnd,
+          },
+        })
+        .lean();
+
+      if (sourcePlanning.length === 0) {
+        return {
+          message: "No planning found in the source month.",
+          copied: 0,
+          sourceMonth,
+          destinationMonth,
+        };
+      }
+
+      // ==================================================
+      // DESTINATION MONTH RANGE
+      // ==================================================
+
+      const destinationStart = new Date(
+        Date.UTC(
+          destinationYear,
+          destinationMonthNumber - 1,
+          1,
+          0,
+          0,
+          0,
+          0,
+        ),
+      );
+
+      const destinationEnd = new Date(
+        Date.UTC(
+          destinationYear,
+          destinationMonthNumber,
+          0,
+          23,
+          59,
+          59,
+          999,
+        ),
+      );
+
+      // ==================================================
+      // REMOVE EXISTING DESTINATION PLANNING
+      // ==================================================
+
+      await this.planningModel.deleteMany({
+        planDate: {
+          $gte: destinationStart,
+          $lte: destinationEnd,
+        },
+      });
+
+      // ==================================================
+      // GROUP SOURCE PLANNING BY EXACT DATE
+      // ==================================================
+
+      const planningByDate = new Map<
+        string,
+        any[]
+      >();
+
+      for (const record of sourcePlanning) {
+        const sourceDate = new Date(record.planDate);
+
+        /*
+          planDate is stored in MongoDB as UTC midnight.
+
+          Example:
+
+          2026-08-29T00:00:00.000Z
+
+          toISOString() therefore gives:
+
+          2026-08-29T00:00:00.000Z
+
+          and the date remains:
+
+          2026-08-29
+        */
+
+        const dateKey = sourceDate
+          .toISOString()
+          .split("T")[0];
+
+        if (!planningByDate.has(dateKey)) {
+          planningByDate.set(dateKey, []);
+        }
+
+        planningByDate
+          .get(dateKey)!
+          .push(record);
+      }
+
+      // ==================================================
+      // KEEP ONE SOURCE OCCURRENCE PER WEEKDAY
+      // ==================================================
+
+      /*
+        JavaScript weekday values:
+
+        0 = Sunday
+        1 = Monday
+        2 = Tuesday
+        3 = Wednesday
+        4 = Thursday
+        5 = Friday
+        6 = Saturday
+      */
+
+      const planningByWeekday: (any[] | null)[] =
+        new Array(7).fill(null);
+
+      for (const [dateKey, records] of planningByDate) {
+        const [year, month, day] =
+          dateKey.split("-").map(Number);
+
+        /*
+          Re-create the calendar date at UTC midnight.
+
+          Example:
+
+          2026-08-29
+              ↓
+          2026-08-29T00:00:00.000Z
+              ↓
+          getUTCDay()
+              ↓
+          6 = Saturday
+        */
+
+        const sourceDate = new Date(
+          Date.UTC(
+            year,
+            month - 1,
+            day,
+          ),
+        );
+
+        const weekday =
+          sourceDate.getUTCDay();
+
+        /*
+          Keep only the FIRST occurrence of each weekday.
+
+          Example:
+
+          August:
+            Saturday 1  → keep
+            Saturday 8  → ignore
+            Saturday 15 → ignore
+            Saturday 22 → ignore
+            Saturday 29 → ignore
+
+          The planning from the first Saturday
+          will be used for every Saturday in
+          the destination month.
+        */
+
+        if (planningByWeekday[weekday] === null) {
+          planningByWeekday[weekday] = records;
+        }
+      }
+
+      // ==================================================
+      // NUMBER OF DAYS IN DESTINATION MONTH
+      // ==================================================
+
+      const lastDayOfDestinationMonth =
+        new Date(
+          Date.UTC(
+            destinationYear,
+            destinationMonthNumber,
+            0,
+          ),
+        ).getUTCDate();
+
+      // ==================================================
+      // CREATE DESTINATION PLANNING
+      // ==================================================
+
+      const copiedPlanning: any[] = [];
+
+      for (
+        let day = 1;
+        day <= lastDayOfDestinationMonth;
+        day++
+      ) {
+        /*
+          IMPORTANT:
+
+          Always create destination dates with UTC.
+
+          Do NOT use:
+
+            new Date(year, month, day)
+
+          because that creates a LOCAL timezone date.
+
+          Instead use:
+
+            Date.UTC(year, month, day)
+        */
+
+        const destinationDate = new Date(
+          Date.UTC(
+            destinationYear,
+            destinationMonthNumber - 1,
+            day,
+            0,
+            0,
+            0,
+            0,
+          ),
+        );
+
+        /*
+          Determine weekday from the UTC calendar date.
+
+          Example:
+
+          September 5, 2026
+              ↓
+          getUTCDay()
+              ↓
+          6 = Saturday
+        */
+
+        const weekday =
+          destinationDate.getUTCDay();
+
+        const weekdayPlanning =
+          planningByWeekday[weekday];
+
+        /*
+          If the source month has no planning
+          for this weekday, don't create anything.
+        */
+
+        if (!weekdayPlanning) {
+          continue;
+        }
+
+        // ==================================================
+        // COPY EACH PLANNING RECORD
+        // ==================================================
+
+        for (const record of weekdayPlanning) {
+          copiedPlanning.push({
+            shiftId: record.shiftId,
+
+            empId: record.empId,
+
+            backupEmpId:
+              record.backupEmpId ?? null,
+
+            taskId: record.taskId,
+
+            /*
+              Destination date is stored at UTC midnight.
+            */
+
+            planDate: destinationDate,
+
+            tasks:
+              record.tasks ?? [],
+
+            customStartTime:
+              record.customStartTime ??
+              undefined,
+
+            customEndTime:
+              record.customEndTime ??
+              undefined,
+          });
+        }
+      }
+
+      // ==================================================
+      // SAVE NEW PLANNING
+      // ==================================================
+
+      if (copiedPlanning.length > 0) {
+        await this.planningModel.insertMany(
+          copiedPlanning,
+        );
+      }
+
+      // ==================================================
+      // RESULT
+      // ==================================================
+
+      return {
+        message:
+          "Planning copied successfully.",
+
+        copied:
+          copiedPlanning.length,
+
+        sourceMonth,
+
+        destinationMonth,
+      };
     }
 }
