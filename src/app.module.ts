@@ -6,6 +6,7 @@ import { ShiftsModule } from './shifts/shifts.module';
 import { PlanningModule } from './planning/planning.module';
 import { WorktimeModule } from './worktime/worktime.module';
 import { TasksModule } from './tasks/tasks.module';
+import { AdvancesModule } from './advances/advances.module';
 
 @Module({
   imports: [
@@ -20,7 +21,8 @@ import { TasksModule } from './tasks/tasks.module';
     ShiftsModule,
     PlanningModule,
     WorktimeModule,
-    TasksModule,   
+    TasksModule,
+    AdvancesModule,   
   ],
 })
 export class AppModule {}

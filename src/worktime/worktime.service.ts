@@ -5,22 +5,39 @@ import { Worktime, WorktimeDocument } from './worktime.shema';
 
 @Injectable()
 export class WorktimeService {
-  constructor(@InjectModel(Worktime.name) private worktimeModel: Model<WorktimeDocument>) {}
+  constructor(@InjectModel(Worktime.name) private worktimeModel: Model<WorktimeDocument>) { }
 
   async create(data: Partial<Worktime>): Promise<WorktimeDocument> {
     return this.worktimeModel.create(data);
   }
 
- async findAll(query: Record<string, any> = {}): Promise<WorktimeDocument[]> {
-  const filter: Record<string, any> = {};
+  async findAll(query: Record<string, any> = {}): Promise<WorktimeDocument[]> {
+    const filter: Record<string, any> = {};
 
-  if (query.emp_id)    filter.emp_id   = Number(query.emp_id);
-  if (query.shift_id)  filter.shift_id = Number(query.shift_id);
-  if (query.work_date) filter.work_date = new Date(query.work_date);
+    if (query.emp_id) filter.emp_id = Number(query.emp_id);
+    if (query.shift_id) filter.shift_id = Number(query.shift_id);
+    if (query.work_date) filter.work_date = new Date(query.work_date);
 
-  return this.worktimeModel.find(filter).exec();
-}
-  async findOne(id: string): Promise<WorktimeDocument | null > {
+    return this.worktimeModel.find(filter).exec();
+  }
+  async findForReport(query: Record<string, any> = {}): Promise<WorktimeDocument[]> {
+    const filter: Record<string, any> = {};
+
+    if (query.emp_id || query.empId) {
+      filter.emp_id = Number(query.emp_id ?? query.empId);
+    }
+
+    if (query.start && query.end) {
+      filter.work_date = {
+        $gte: new Date(query.start),
+        $lte: new Date(query.end),
+      };
+    }
+
+    return this.worktimeModel.find(filter).exec();
+  }
+  
+  async findOne(id: string): Promise<WorktimeDocument | null> {
     return this.worktimeModel.findById(id).populate('empId').populate('shiftId').exec();
   }
 
