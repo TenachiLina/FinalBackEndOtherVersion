@@ -1,5 +1,17 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Param,
+  Body,
+  Query,
+  Res,
+} from '@nestjs/common';
 import { PlanningService } from './planning.service';
+import type { Response } from "express";
+
 
 @Controller('planning')
 export class PlanningController {
@@ -26,6 +38,86 @@ export class PlanningController {
     }
   }
 
+  @Get('import/:date')
+  async importFromDate(@Param('date') date: string) {
+    return this.planningService.importFromDate(date);
+  }
+  
+  @Get("export-first-week")
+  async exportFirstWeek(
+    @Query("year") year: string,
+    @Query("month") month: string,
+    @Query("format") format: string,
+    @Res() res: Response,
+  ) {
+    if (format === "pdf") {
+      return this.planningService.exportFirstWeekPdf(
+        Number(year),
+        Number(month),
+        res,
+      );
+    }
+
+    const workbook = await this.planningService.exportFirstWeek(
+      Number(year),
+      Number(month),
+    );
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="WeeklyPlanning.xlsx"',
+    );
+
+    await workbook.xlsx.write(res);
+    res.end();
+  }
+
+  @Get("export-current-day")
+  async exportCurrentDay(
+    @Query("year") year: string,
+    @Query("month") month: string,
+    @Query("day") day: string,
+    @Query("format") format: string,
+    @Res() res: Response,
+  ) {
+     
+    console.log("Exporting current day with format:", format, "for date:", year, month, day);
+    if (format === "pdf") {
+
+      return this.planningService.exportCurrentDayPdf(
+        Number(year),
+        Number(month),
+        Number(day),
+        res,
+      );
+    }
+
+    const workbook =
+      await this.planningService.exportCurrentDay(
+        Number(year),
+        Number(month),
+        Number(day),
+      );
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="DailyPlanning.xlsx"`,
+    );
+
+    await workbook.xlsx.write(res);
+
+    res.end();
+  }
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.planningService.findOne(id);
@@ -39,5 +131,19 @@ export class PlanningController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.planningService.remove(id);
+  }
+
+  @Post("copy-month")
+  async copyMonth(
+    @Body()
+    body: {
+      sourceMonth: string;
+      destinationMonth: string;
+    },
+  ) {
+    return this.planningService.copyMonth(
+      body.sourceMonth,
+      body.destinationMonth,
+    );
   }
 }
