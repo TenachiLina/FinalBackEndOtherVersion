@@ -40,6 +40,7 @@ export class Worktime {
 
   @Prop()
   absent_comment?: string;
+
 }
 
 export const WorktimeSchema = SchemaFactory.createForClass(Worktime);
