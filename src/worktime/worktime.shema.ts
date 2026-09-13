@@ -5,41 +5,67 @@ export type WorktimeDocument = HydratedDocument<Worktime>;
 
 @Schema({ collection: 'worktime' })
 export class Worktime {
-  @Prop()
-  worktime_id?: number;
+ @Prop()
+shift_id?: string;
 
-  @Prop()
-  emp_id?: number;
+@Prop({ default: "0" })
+late_minutes?: string;
 
-  @Prop()
-  shift_id?: string;   // ← change from number to string
+@Prop({ default: "0" })
+overtime_minutes?: string;
 
-  @Prop({ required: true })
-  work_date!: Date;
+@Prop({ default: "0" })
+work_hours?: string;
 
-  @Prop({ default: '0' })
-  late_minutes?: string;
+@Prop()
+consomation?: number;
 
-  @Prop({ default: '0' })
-  overtime_minutes?: string;
+@Prop({ default: 0 })
+penalty?: number;
 
-  @Prop({ default: '0' })
-  work_hours?: string;
+@Prop({ default: 0 })
+bonus?: number;
 
-  @Prop()
-  consomation?: number;
+@Prop({ default: false })
+absent?: boolean;
 
-  @Prop({ default: 0 })
-  penalty?: number;
-
-  @Prop({ default: 0 })
-  bonus?: number;
-
-  @Prop({ default: false })
-  absent?: boolean;
-
-  @Prop()
-  absent_comment?: string;
+@Prop()
+absent_comment?: string;
 }
 
 export const WorktimeSchema = SchemaFactory.createForClass(Worktime);
+
+
+/*
+@Prop()
+shift_id?: number;
+
+@Prop({ default: "00:00" })
+clock_in?: string;
+
+@Prop({ default: "00:00" })
+clock_out?: string;
+
+@Prop({ default: "0" })
+late_minutes?: string;
+
+@Prop({ default: "0" })
+overtime_minutes?: string;
+
+@Prop({ default: "0" })
+work_hours?: string;
+
+@Prop()
+consomation?: number;
+
+@Prop({ default: 0 })
+penalty?: number;
+
+@Prop({ default: 0 })
+bonus?: number;
+
+@Prop({ default: false })
+absent?: boolean;
+
+@Prop()
+absent_comment?: string; */
