@@ -496,7 +496,7 @@ export class PlanningService {
     const dateRangeText =
       `From: ${firstDayNumber} ${monthName} ${year} ` +
       `to ${lastDayNumber} ${monthName} ${year}`;
-
+ 
     // ==================================================
     // DRAW TITLE
     // ==================================================
