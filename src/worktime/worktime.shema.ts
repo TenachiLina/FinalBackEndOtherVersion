@@ -3,69 +3,63 @@ import { HydratedDocument } from 'mongoose';
 
 export type WorktimeDocument = HydratedDocument<Worktime>;
 
-@Schema({ collection: 'worktime' })
+@Schema({
+  collection: 'worktime',
+})
 export class Worktime {
- @Prop()
-shift_id?: string;
 
-@Prop({ default: "0" })
-late_minutes?: string;
+  // Employee number
+  @Prop({ required: true })
+  emp_id!: number;
 
-@Prop({ default: "0" })
-overtime_minutes?: string;
+  // Shift ID from the planning/shift collection
+  @Prop()
+  shift_id?: string;
 
-@Prop({ default: "0" })
-work_hours?: string;
+  // Operational attendance date
+  @Prop()
+  work_date?: Date;
 
-@Prop()
-consomation?: number;
+  // First clock-in of the day
+  @Prop({ default: '00:00' })
+  clock_in?: string;
 
-@Prop({ default: 0 })
-penalty?: number;
+  // Final clock-out of the day
+  @Prop({ default: '00:00' })
+  clock_out?: string;
 
-@Prop({ default: 0 })
-bonus?: number;
+  // Total delay relative to the shift
+  @Prop({ default: '0' })
+  late_minutes?: string;
 
-@Prop({ default: false })
-absent?: boolean;
+  // Overtime relative to the shift
+  @Prop({ default: '0' })
+  overtime_minutes?: string;
 
-@Prop()
-absent_comment?: string;
+  // Total worked time across ALL periods
+  @Prop({ default: '00:00' })
+  work_hours?: string;
+
+  // Consumption
+  @Prop({ default: 0 })
+  consomation?: number;
+
+  // Penalty
+  @Prop({ default: 0 })
+  penalty?: number;
+
+  // Bonus
+  @Prop({ default: 0 })
+  bonus?: number;
+
+  // Absence
+  @Prop({ default: false })
+  absent?: boolean;
+
+  // Absence reason
+  @Prop()
+  absent_comment?: string;
 }
 
-export const WorktimeSchema = SchemaFactory.createForClass(Worktime);
-
-
-/*
-@Prop()
-shift_id?: number;
-
-@Prop({ default: "00:00" })
-clock_in?: string;
-
-@Prop({ default: "00:00" })
-clock_out?: string;
-
-@Prop({ default: "0" })
-late_minutes?: string;
-
-@Prop({ default: "0" })
-overtime_minutes?: string;
-
-@Prop({ default: "0" })
-work_hours?: string;
-
-@Prop()
-consomation?: number;
-
-@Prop({ default: 0 })
-penalty?: number;
-
-@Prop({ default: 0 })
-bonus?: number;
-
-@Prop({ default: false })
-absent?: boolean;
-
-@Prop()
-absent_comment?: string; */
+export const WorktimeSchema =
+  SchemaFactory.createForClass(Worktime);
