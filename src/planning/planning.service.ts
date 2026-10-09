@@ -128,163 +128,163 @@ export class PlanningService {
     }));
   }
 
-  private async buildFirstWeekPlanning(
-    year: number,
-    month: number,
-  ): Promise<{
-    weekGrid: Record<string, Record<string, string[]>>;
-    weekDays: string[];
-    weekDates: Date[];
-    hours: string[];
-  }>{
-      // --------------------------------------------------
-      // 1. Month range
-      // --------------------------------------------------
-      const monthStart = new Date(year, month - 1, 1);
-      monthStart.setHours(0, 0, 0, 0);
+  private async buildFirstWeekPlanningWithBackup(
+      year: number,
+      month: number,
+    ): Promise<{
+      weekGrid: Record<string, Record<string, string[]>>;
+      weekDays: string[];
+      weekDates: Date[];
+      hours: string[];
+    }>{
+        // --------------------------------------------------
+        // 1. Month range
+        // --------------------------------------------------      
+        const monthStart = new Date(year, month, 1);
+        monthStart.setHours(0, 0, 0, 0);
 
-      const monthEnd = new Date(year, month, 0);
-      monthEnd.setHours(23, 59, 59, 999);
+        const monthEnd = new Date(year, month + 1, 0);
+        monthEnd.setHours(23, 59, 59, 999);
 
-      // --------------------------------------------------
-      // 2. Load all planning for the month
-      // --------------------------------------------------
-      const planning = await this.planningModel
-        .find({
-          planDate: {
-            $gte: monthStart,
-            $lte: monthEnd,
-          },
-        })
-        .populate("empId")
-        .populate("backupEmpId")
-        .populate("shiftId")
-        .lean();
+        // --------------------------------------------------
+        // 2. Load all planning for the month
+        // --------------------------------------------------
+        const planning = await this.planningModel
+          .find({
+            planDate: {
+              $gte: monthStart,
+              $lte: monthEnd,
+            },
+          })
+          .populate("empId")
+          .populate("backupEmpId")
+          .populate("shiftId")
+          .lean();
 
-      // --------------------------------------------------
-      // 3. Days order (always Saturday -> Friday)
-      // --------------------------------------------------
-      const weekDays = [
-        "Saturday",
-        "Sunday",
-        "Monday",
-        "Tuesday",
-        "Wednesday",
-        "Thursday",
-        "Friday",
-      ];
+        // --------------------------------------------------
+        // 3. Days order (always Saturday -> Friday)
+        // --------------------------------------------------
+        const weekDays = [
+          "Saturday",
+          "Sunday",
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+        ];
 
-      // --------------------------------------------------
-      // 4. Calculate first week's dates
-      // --------------------------------------------------
-      const firstDay = new Date(year, month - 1, 1);
+        // --------------------------------------------------
+        // 4. Calculate first week's dates
+        // --------------------------------------------------
+        const firstDay = new Date(year, month, 1);
 
-      // JS weekday:
-      // Sunday=0 Monday=1 ... Saturday=6
-      const jsWeekDay = firstDay.getDay();
+        // JS weekday:
+        // Sunday=0 Monday=1 ... Saturday=6
+        const jsWeekDay = firstDay.getDay();
 
-      // Convert to Saturday-first index
-      const firstColumn = (jsWeekDay + 1) % 7;
+        // Convert to Saturday-first index
+        const firstColumn = (jsWeekDay + 1) % 7;
 
-      const weekDates: Date[] = [];
+        const weekDates: Date[] = [];
 
-      for (let i = 0; i < 7; i++) {
+        for (let i = 0; i < 7; i++) {
 
-        const d = new Date(firstDay);
+          const d = new Date(firstDay);
 
-        d.setDate(
-          1 + ((i - firstColumn + 7) % 7)
-        );
+          d.setDate(
+            1 + ((i - firstColumn + 7) % 7)
+          );
 
-        d.setHours(0,0,0,0);
+          d.setHours(0,0,0,0);
 
-        weekDates.push(d);
-      }
+          weekDates.push(d);
+        }
+        console.log("Exporting first week as PDF - Week dates:", weekDates.map(d => d.toDateString())); 
 
-      // --------------------------------------------------
-      // 5. Hours
-      // --------------------------------------------------
-      const hours = [
-        "06H",
-        "07H",
-        "08H",
-        "09H",
-        "10H",
-        "11H",
-        "12H",
-        "14H",
-        "15H",
-        "16H",
-      ];
+        // --------------------------------------------------
+        // 5. Hours
+        // --------------------------------------------------
+        const hours = [
+          "06H",
+          "07H",
+          "08H",
+          "09H",
+          "10H",
+          "11H",
+          "12H",
+          "14H",
+          "15H",
+          "16H",
+        ];
 
-      // --------------------------------------------------
-      // 6. Empty grid
-      // --------------------------------------------------
-      const weekGrid: Record<string, Record<string, string[]>> = {};
+        // --------------------------------------------------
+        // 6. Empty grid
+        // --------------------------------------------------
+        const weekGrid: Record<string, Record<string, string[]>> = {};
 
-      weekDays.forEach(day => {
+        weekDays.forEach(day => {
 
-        weekGrid[day] = {};
+          weekGrid[day] = {};
 
-        hours.forEach(hour => {
-          weekGrid[day][hour] = [];
+          hours.forEach(hour => {
+            weekGrid[day][hour] = [];
+          });
+
         });
 
-      });
+        // --------------------------------------------------
+        // 7. Fill grid
+        // --------------------------------------------------
+        planning.forEach((item: any) => {
 
-      // --------------------------------------------------
-      // 7. Fill grid
-      // --------------------------------------------------
-      planning.forEach((item: any) => {
+          const itemDate = new Date(item.planDate);
+          itemDate.setHours(0,0,0,0);
 
-        const itemDate = new Date(item.planDate);
-        itemDate.setHours(0,0,0,0);
+          const index = weekDates.findIndex(d =>
+            d.getFullYear() === itemDate.getFullYear() &&
+            d.getMonth() === itemDate.getMonth() &&
+            d.getDate() === itemDate.getDate()
+          );
 
-        const index = weekDates.findIndex(d =>
-          d.getFullYear() === itemDate.getFullYear() &&
-          d.getMonth() === itemDate.getMonth() &&
-          d.getDate() === itemDate.getDate()
-        );
+          if(index === -1)
+            return;
 
-        if(index === -1)
-          return;
+          const day = weekDays[index];
 
-        const day = weekDays[index];
+          let startTime: string;
 
-        let startTime: string;
+          if(item.tasks?.length){
+            startTime = item.tasks[0].startTime;
+          }else{
+            startTime = item.shiftId.startTime;
+          }
 
-        if(item.tasks?.length){
-          startTime = item.tasks[0].startTime;
-        }else{
-          startTime = item.shiftId.startTime;
-        }
+          const hour = `${startTime.substring(0,2)}H`;
 
-        const hour = `${startTime.substring(0,2)}H`;
+        const employee =
+          `${item.empId.firstName} ${item.empId.lastName}` +
+          (
+            item.backupEmpId
+              ? `\nBackup: ${item.backupEmpId.firstName} ${item.backupEmpId.lastName}`
+              : `\nBackup: No backup`
+          );
 
-       const employee =
-        `${item.empId.firstName} ${item.empId.lastName}` +
-        (
-          item.backupEmpId
-            ? `\nBackup: ${item.backupEmpId.firstName} ${item.backupEmpId.lastName}`
-            : `\nBackup: No backup`
-        );
+          if(weekGrid[day][hour]){
+            weekGrid[day][hour].push(employee);
+          }
 
-        if(weekGrid[day][hour]){
-          weekGrid[day][hour].push(employee);
-        }
+        });
 
-      });
-
-      return {
-        weekGrid,
-        weekDays,
-        weekDates,
-        hours,
-    };
-  }
-
+        return {
+          weekGrid,
+          weekDays,
+          weekDates,
+          hours,
+      };
+    }
   //Export Week in Excel Format
-  async exportFirstWeek(
+  async exportFirstWeekWithBackups(
   year: number,
   month: number,
   ): Promise<ExcelJS.Workbook> {
@@ -292,7 +292,7 @@ export class PlanningService {
       weekGrid,
       weekDays,
       hours,
-    } = await this.buildFirstWeekPlanning(year, month);
+    } = await this.buildFirstWeekPlanningWithBackup(year, month);
     // --------------------------------------------------
     // 8. Workbook
     // --------------------------------------------------
@@ -362,7 +362,745 @@ export class PlanningService {
     });
     return workbook;
   }
+  // Export Week in PDF Format
+  async exportFirstWeekPdfWithBackups(
+    year: number,
+    month: number,
+    res: Response,
+  ): Promise<void> {
+    const {
+      weekGrid,
+      weekDays,
+      hours,
+    } = await this.buildFirstWeekPlanningWithBackup(year, month);
+    const PDFDocument = require("pdfkit");
+    const doc = new PDFDocument({
+      size: "A4",
+      layout: "landscape",
+      margin: 20,
+    });
+    res.setHeader(
+      "Content-Type",
+      "application/pdf",
+    );
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="FirstWeekPlanning.pdf"',
+    );
+    doc.pipe(res);
+    // ==================================================
+    // PAGE DIMENSIONS
+    // ==================================================
+    const pageWidth = doc.page.width;
+    const pageHeight = doc.page.height;
+    const margin = 20;
+    const availableWidth =
+      pageWidth - margin * 2;
+    // ==================================================
+    // TABLE WIDTH
+    // ==================================================
+    const hourWidth = 50;
+    const dayWidth =
+      (availableWidth - hourWidth) / 7;
+    const startX = margin;
+    // ==================================================
+    // FONTS
+    // ==================================================
+    const headerFontSize = 9;
+    // Employee font
+    const employeeFontSize = 6.5;
+    const hourFontSize = 8;
+    // ==================================================
+    // HEADER HEIGHT
+    // ==================================================
+    const headerHeight = 30;
+    // Minimum height for a normal row
+    const minimumRowHeight = 30;
+    // Padding inside employee cells
+    const cellPadding = 5;
+    // ==================================================
+    // MONTH DATE RANGE
+    // ==================================================
+    /*
+    * IMPORTANT:
+    *
+    * JavaScript months are 0-based:
+    *
+    * January  = 0
+    * February = 1
+    * ...
+    * August   = 7
+    * September = 8
+    *
+    * Therefore:
+    *
+    * new Date(year, month, 1)
+    * new Date(year, month + 1, 0)
+    *
+    * correctly gives the first and last day
+    * of the requested month.
+    */
+    const firstDayOfMonth =
+      new Date(year, month, 1);
+    const lastDayOfMonth =
+      new Date(year, month + 1, 0);
+    /*
+    * Use numeric date formatting here.
+    *
+    * This avoids timezone-related problems that can
+    * accidentally move the date to the previous/next day.
+    */
+    const monthName =
+      firstDayOfMonth.toLocaleDateString(
+        "en-US",
+        {
+          month: "long",
+        },
+      );
+    const firstDayNumber =
+      firstDayOfMonth.getDate();
+    const lastDayNumber =
+      lastDayOfMonth.getDate();
+    const dateRangeText =
+      `From: ${firstDayNumber} ${monthName} ${year} ` +
+      `to ${lastDayNumber} ${monthName} ${year}`;
+    // ==================================================
+    // DRAW TITLE
+    // ==================================================
+    const drawTitle = () => {
+      // ------------------------------------------------
+      // Main title
+      // ------------------------------------------------
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(16)
+        .text(
+          "First Week Planning",
+          0,
+          15,
+          {
+            align: "center",
+            width: pageWidth,
+          },
+        );
+      // ------------------------------------------------
+      // Date range
+      // ------------------------------------------------
+      doc
+        .font("Helvetica")
+        .fontSize(9)
+        .text(
+          dateRangeText,
+          0,
+          38,
+          {
+            align: "center",
+            width: pageWidth,
+          },
+        );
+    };
+    // ==================================================
+    // DRAW HEADER
+    // ==================================================
+    const drawHeader = (startY: number) => {
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(headerFontSize);
+      let x = startX;
+      // ----------------------------------------------
+      // Hour header
+      // ----------------------------------------------
+      doc
+        .rect(
+          x,
+          startY,
+          hourWidth,
+          headerHeight,
+        )
+        .stroke();
+      doc.text(
+        "Hour",
+        x,
+        startY + 10,
+        {
+          width: hourWidth,
+          align: "center",
+        },
+      );
+      x += hourWidth;
+      // ----------------------------------------------
+      // Days headers
+      // ----------------------------------------------
+      weekDays.forEach((day) => {
+        doc
+          .rect(
+            x,
+            startY,
+            dayWidth,
+            headerHeight,
+          )
+          .stroke();
+        doc.text(
+          day,
+          x,
+          startY + 10,
+          {
+            width: dayWidth,
+            align: "center",
+          },
+        );
+        x += dayWidth;
+      });
+    };
+    // ==================================================
+    // GET EMPLOYEE / BACKUP PARTS
+    // ==================================================
+    /*
+    * The PDF data is expected to contain employees
+    * like:
+    *
+    * John Smith
+    * (Backup: Ahmed Ali)
+    *
+    * Main employee will be displayed in BOLD.
+    *
+    * Backup will be displayed in NORMAL font.
+    */
+    const getEmployeeParts = (employee: string) => {
+      const backupMatch =
+        employee.match(
+          /\(Backup:\s*(.*?)\)/i,
+        );
+      if (!backupMatch) {
+        console.log("No backup found for employee:", employee);
+        return {
+          main: employee,
+          backup: null,
+        };
+      }
+      const main =
+        employee
+          .replace(
+            backupMatch[0],
+            "",
+          )
+          .trim();
+      const backup =
+        `Backup: ${backupMatch[1].trim()}`;
+      return {
+        main,
+        backup,
+      };
+    };
+    // ==================================================
+    // CALCULATE EMPLOYEE TEXT HEIGHT
+    // ==================================================
+    const calculateEmployeeHeight = (
+      employees: string[],
+    ) => {
+      let totalHeight = 0;
+      employees.forEach((employee) => {
+        const {
+          main,
+          backup,
+        } = getEmployeeParts(employee);
+        // ----------------------------------------------
+        // Main employee
+        // ----------------------------------------------
+        doc
+          .font("Helvetica-Bold")
+          .fontSize(employeeFontSize);
+        totalHeight +=
+          doc.heightOfString(
+            main,
+            {
+              width:
+                dayWidth -
+                cellPadding * 2,
+              lineGap: 0,
+            },
+          );
+        // ----------------------------------------------
+        // Backup employee
+        // ----------------------------------------------
+        if (backup) {
+          doc
+            .font("Helvetica")
+            .fontSize(employeeFontSize);
+          totalHeight +=
+            doc.heightOfString(
+              backup,
+              {
+                width:
+                  dayWidth -
+                  cellPadding * 2,
+                lineGap: 0,
+              },
+            );
+        }
+      });
+      return totalHeight;
+    };
+    // ==================================================
+    // DRAW EMPLOYEES
+    // ==================================================
+    const drawEmployees = (
+      employees: string[],
+      x: number,
+      y: number,
+      availableHeight: number,
+    ) => {
+      if (employees.length === 0) {
+        return;
+      }
+      const totalHeight =
+        calculateEmployeeHeight(
+          employees,
+        );
+      // Vertically center employees
+      let textY =
+        y +
+        Math.max(
+          cellPadding,
+          (availableHeight -
+            totalHeight) / 2,
+        );
+      employees.forEach((employee) => {
+        const {
+          main,
+          backup,
+        } = getEmployeeParts(employee);
+        // ==================================================
+        // MAIN EMPLOYEE — BOLD
+        // ==================================================
+        doc
+          .font("Helvetica-Bold")
+          .fontSize(employeeFontSize);
+        const mainHeight =
+          doc.heightOfString(
+            main,
+            {
+              width:
+                dayWidth -
+                cellPadding * 2,
+              lineGap: 0,
+            },
+          );
+        doc.text(
+          main,
+          x + cellPadding,
+          textY,
+          {
+            width:
+              dayWidth -
+              cellPadding * 2,
+            align: "center",
+            lineGap: 0,
+          },
+        );
+        textY += mainHeight;
+        // ==================================================
+        // BACKUP EMPLOYEE — NORMAL
+        // ==================================================
+        if (backup) {
+          doc
+            .font("Helvetica")
+            .fontSize(employeeFontSize);
+          const backupHeight =
+            doc.heightOfString(
+              backup,
+              {
+                width:
+                  dayWidth -
+                  cellPadding * 2,
+                lineGap: 0,
+              },
+            );
+          doc.text(
+            backup,
+            x + cellPadding,
+            textY,
+            {
+              width:
+                dayWidth -
+                cellPadding * 2,
+              align: "center",
+              lineGap: 0,
+            },
+          );
+          textY += backupHeight;
+        }
+      });
+    };
+    // ==================================================
+    // TITLE + FIRST HEADER
+    // ==================================================
+    drawTitle();
+    /*
+    * Title:
+    *      First Week Planning
+    *
+    * Date:
+    *      From: 1 August 2026 to 31 August 2026
+    *
+    * Therefore table starts below both.
+    */
+    let currentY = 62;
+    drawHeader(currentY);
+    currentY += headerHeight;
+    // ==================================================
+    // ROWS
+    // ==================================================
+    hours.forEach((hour) => {
+      // ------------------------------------------------
+      // Calculate required row height
+      // ------------------------------------------------
+      let requiredRowHeight =
+        minimumRowHeight;
+      weekDays.forEach((day) => {
+        const employees =
+          weekGrid[day]?.[hour] ?? [];
+        if (employees.length === 0) {
+          return;
+        }
+        // Calculate employee + backup height
+        const textHeight =
+          calculateEmployeeHeight(
+            employees,
+          );
+        const cellHeight =
+          textHeight +
+          cellPadding * 2;
+        if (
+          cellHeight >
+          requiredRowHeight
+        ) {
+          requiredRowHeight =
+            cellHeight;
+        }
+      });
+      // ------------------------------------------------
+      // Make sure row doesn't go outside page
+      // ------------------------------------------------
+      if (
+        currentY +
+          requiredRowHeight >
+        pageHeight - margin
+      ) {
+        // ==================================================
+        // NEW PAGE
+        // ==================================================
+        doc.addPage();
+        // Draw title and date again
+        drawTitle();
+        currentY = 62;
+        drawHeader(currentY);
+        currentY += headerHeight;
+      }
+      // ==================================================
+      // DRAW HOUR CELL
+      // ==================================================
+      doc
+        .font("Helvetica")
+        .fontSize(hourFontSize);
+      doc
+        .rect(
+          startX,
+          currentY,
+          hourWidth,
+          requiredRowHeight,
+        )
+        .stroke();
+      doc.text(
+        hour,
+        startX,
+        currentY +
+          (requiredRowHeight / 2) -
+          5,
+        {
+          width: hourWidth,
+          align: "center",
+        },
+      );
+      // ==================================================
+      // DRAW EMPLOYEE CELLS
+      // ==================================================
+      let x =
+        startX + hourWidth;
+      weekDays.forEach((day) => {
+        // ------------------------------------------------
+        // Cell border
+        // ------------------------------------------------
+        doc
+          .rect(
+            x,
+            currentY,
+            dayWidth,
+            requiredRowHeight,
+          )
+          .stroke();
+        // ------------------------------------------------
+        // Employees
+        // ------------------------------------------------
+        const employees =
+          weekGrid[day]?.[hour] ?? [];
+        if (employees.length > 0) {
+          drawEmployees(
+            employees,
+            x,
+            currentY,
+            requiredRowHeight,
+          );
+        }
+        x += dayWidth;
+      });
+      // ------------------------------------------------
+      // Move to next row
+      // ------------------------------------------------
+      currentY += requiredRowHeight;
+    });
+    // ==================================================
+    // FINISH PDF
+    // ==================================================
+    doc.end();
+  }
 
+
+  private async buildFirstWeekPlanningWithoutBackups(
+    year: number,
+    month: number,
+  ): Promise<{
+    weekGrid: Record<string, Record<string, string[]>>;
+    weekDays: string[];
+    weekDates: Date[];
+    hours: string[];
+  }>{
+      // --------------------------------------------------
+      // 1. Month range
+      // --------------------------------------------------      
+      const monthStart = new Date(year, month, 1);
+      monthStart.setHours(0, 0, 0, 0);
+
+      const monthEnd = new Date(year, month + 1, 0);
+      monthEnd.setHours(23, 59, 59, 999);
+
+      // --------------------------------------------------
+      // 2. Load all planning for the month
+      // --------------------------------------------------
+      const planning = await this.planningModel
+        .find({
+          planDate: {
+            $gte: monthStart,
+            $lte: monthEnd,
+          },
+        })
+        .populate("empId")
+        .populate("backupEmpId")
+        .populate("shiftId")
+        .lean();
+
+      // --------------------------------------------------
+      // 3. Days order (always Saturday -> Friday)
+      // --------------------------------------------------
+      const weekDays = [
+        "Saturday",
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+      ];
+
+      // --------------------------------------------------
+      // 4. Calculate first week's dates
+      // --------------------------------------------------
+      const firstDay = new Date(year, month, 1);
+
+      // JS weekday:
+      // Sunday=0 Monday=1 ... Saturday=6
+      const jsWeekDay = firstDay.getDay();
+
+      // Convert to Saturday-first index
+      const firstColumn = (jsWeekDay + 1) % 7;
+
+      const weekDates: Date[] = [];
+
+      for (let i = 0; i < 7; i++) {
+
+        const d = new Date(firstDay);
+
+        d.setDate(
+          1 + ((i - firstColumn + 7) % 7)
+        );
+
+        d.setHours(0,0,0,0);
+
+        weekDates.push(d);
+      }
+      console.log("Exporting first week as PDF - Week dates:", weekDates.map(d => d.toDateString())); 
+
+      // --------------------------------------------------
+      // 5. Hours
+      // --------------------------------------------------
+      const hours = [
+        "06H",
+        "07H",
+        "08H",
+        "09H",
+        "10H",
+        "11H",
+        "12H",
+        "14H",
+        "15H",
+        "16H",
+      ];
+
+      // --------------------------------------------------
+      // 6. Empty grid
+      // --------------------------------------------------
+      const weekGrid: Record<string, Record<string, string[]>> = {};
+
+      weekDays.forEach(day => {
+
+        weekGrid[day] = {};
+
+        hours.forEach(hour => {
+          weekGrid[day][hour] = [];
+        });
+
+      });
+
+      
+      // --------------------------------------------------
+      // 7. Fill grid — main employees only
+      // --------------------------------------------------
+      planning.forEach((item: any) => {
+        if (!item.empId || !item.shiftId) {
+          return;
+        }
+
+        const itemDate = new Date(item.planDate);
+        itemDate.setHours(0, 0, 0, 0);
+
+        const index = weekDates.findIndex((d) =>
+          d.getFullYear() === itemDate.getFullYear() &&
+          d.getMonth() === itemDate.getMonth() &&
+          d.getDate() === itemDate.getDate()
+        );
+
+        if (index === -1) {
+          return;
+        }
+
+        const day = weekDays[index];
+
+        let startTime: string;
+
+        if (item.tasks?.length) {
+          startTime = item.tasks[0].startTime;
+        } else {
+          startTime = item.shiftId.startTime;
+        }
+
+        const hour = `${startTime.substring(0, 2)}H`;
+
+        // Only the main employee's name is added.
+        const employee =
+          `${item.empId.firstName} ${item.empId.lastName}`;
+
+        if (weekGrid[day][hour]) {
+          weekGrid[day][hour].push(employee);
+        }
+      });
+
+
+      return {
+        weekGrid,
+        weekDays,
+        weekDates,
+        hours,
+    };
+  }
+  //Export Week in Excel Format
+  async exportFirstWeek(
+  year: number,
+  month: number,
+  ): Promise<ExcelJS.Workbook> {
+    const {
+      weekGrid,
+      weekDays,
+      hours,
+    } = await this.buildFirstWeekPlanningWithoutBackups(year, month);
+    // --------------------------------------------------
+    // 8. Workbook
+    // --------------------------------------------------
+    const workbook = new ExcelJS.Workbook();
+    const sheet =
+      workbook.addWorksheet("First Week Planning");
+    // --------------------------------------------------
+    // 9. Header
+    // --------------------------------------------------
+    sheet.addRow([
+      "Hour",
+      ...weekDays,
+    ]);
+    // --------------------------------------------------
+    // 10. Rows
+    // --------------------------------------------------
+    hours.forEach(hour => {
+      const row = [hour];
+      weekDays.forEach(day => {
+        row.push(
+          weekGrid[day][hour].join("\n")
+        );
+      });
+      sheet.addRow(row);
+    });
+    // --------------------------------------------------
+    // 11. Formatting
+    // --------------------------------------------------
+    sheet.columns = [
+      { width: 12 },
+      { width: 25 },
+      { width: 25 },
+      { width: 25 },
+      { width: 25 },
+      { width: 25 },
+      { width: 25 },
+      { width: 25 },
+    ];
+    sheet.eachRow((row, rowNumber) => {
+      row.height = 35;
+      row.eachCell(cell => {
+        cell.alignment = {
+          vertical: "middle",
+          horizontal: "center",
+          wrapText: true,
+        };
+        cell.border = {
+          top: { style: "thin" },
+          bottom: { style: "thin" },
+          left: { style: "thin" },
+          right: { style: "thin" },
+        };
+        if(rowNumber === 1){
+          cell.font = {
+            bold: true,
+            size: 12,
+          };
+          cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: {
+              argb: "D9D9D9",
+            },
+          };
+        }
+      });
+    });
+    return workbook;
+  }
   // Export Week in PDF Format
   async exportFirstWeekPdf(
     year: number,
@@ -374,8 +1112,8 @@ export class PlanningService {
       weekGrid,
       weekDays,
       hours,
-    } = await this.buildFirstWeekPlanning(year, month);
-
+    } = await this.buildFirstWeekPlanningWithoutBackups(year, month);
+  
     const PDFDocument = require("pdfkit");
 
     const doc = new PDFDocument({
@@ -468,7 +1206,7 @@ export class PlanningService {
 
     const firstDayOfMonth =
       new Date(year, month, 1);
-
+    
     const lastDayOfMonth =
       new Date(year, month + 1, 0);
 
@@ -616,101 +1354,34 @@ export class PlanningService {
     * (Backup: Ahmed Ali)
     *
     * Main employee will be displayed in BOLD.
-    *
-    * Backup will be displayed in NORMAL font.
     */
-
-    const getEmployeeParts = (employee: string) => {
-
-      const backupMatch =
-        employee.match(
-          /\(Backup:\s*(.*?)\)/i,
-        );
-
-      if (!backupMatch) {
-
-        return {
-          main: employee,
-          backup: null,
-        };
-      }
-
-      const main =
-        employee
-          .replace(
-            backupMatch[0],
-            "",
-          )
-          .trim();
-
-      const backup =
-        `Backup: ${backupMatch[1].trim()}`;
-
-      return {
-        main,
-        backup,
-      };
+      
+    const getMainEmployeeName = (employee: string): string => {
+      return employee
+        .replace(/\s*\(Backup:\s*[^)]*\)/gi, "")
+        .replace(/Backup:\s*.*$/gim, "")
+        .trim();
     };
 
     // ==================================================
     // CALCULATE EMPLOYEE TEXT HEIGHT
-    // ==================================================
-
-    const calculateEmployeeHeight = (
-      employees: string[],
-    ) => {
-
+    // ==================================================       
+    const calculateEmployeeHeight = (employees: string[]) => {
       let totalHeight = 0;
 
       employees.forEach((employee) => {
+        const main = getMainEmployeeName(employee);
 
-        const {
-          main,
-          backup,
-        } = getEmployeeParts(employee);
-
-        // ----------------------------------------------
-        // Main employee
-        // ----------------------------------------------
+        if (!main) return;
 
         doc
           .font("Helvetica-Bold")
           .fontSize(employeeFontSize);
 
-        totalHeight +=
-          doc.heightOfString(
-            main,
-            {
-              width:
-                dayWidth -
-                cellPadding * 2,
-
-              lineGap: 0,
-            },
-          );
-
-        // ----------------------------------------------
-        // Backup employee
-        // ----------------------------------------------
-
-        if (backup) {
-
-          doc
-            .font("Helvetica")
-            .fontSize(employeeFontSize);
-
-          totalHeight +=
-            doc.heightOfString(
-              backup,
-              {
-                width:
-                  dayWidth -
-                  cellPadding * 2,
-
-                lineGap: 0,
-              },
-            );
-        }
+        totalHeight += doc.heightOfString(main, {
+          width: dayWidth - cellPadding * 2,
+          lineGap: 0,
+        });
       });
 
       return totalHeight;
@@ -718,119 +1389,52 @@ export class PlanningService {
 
     // ==================================================
     // DRAW EMPLOYEES
-    // ==================================================
-
+    // ==================================================    
     const drawEmployees = (
       employees: string[],
       x: number,
       y: number,
       availableHeight: number,
     ) => {
+      const mainEmployees = employees
+        .map(getMainEmployeeName)
+        .filter((name) => name.length > 0);
 
-      if (employees.length === 0) {
-        return;
-      }
+      if (mainEmployees.length === 0) return;
 
-      const totalHeight =
-        calculateEmployeeHeight(
-          employees,
-        );
+      const totalHeight = calculateEmployeeHeight(mainEmployees);
 
-      // Vertically center employees
       let textY =
         y +
         Math.max(
           cellPadding,
-          (availableHeight -
-            totalHeight) / 2,
+          (availableHeight - totalHeight) / 2,
         );
 
-      employees.forEach((employee) => {
-
-        const {
-          main,
-          backup,
-        } = getEmployeeParts(employee);
-
-        // ==================================================
-        // MAIN EMPLOYEE — BOLD
-        // ==================================================
-
+      mainEmployees.forEach((employee) => {
         doc
           .font("Helvetica-Bold")
           .fontSize(employeeFontSize);
 
-        const mainHeight =
-          doc.heightOfString(
-            main,
-            {
-              width:
-                dayWidth -
-                cellPadding * 2,
-
-              lineGap: 0,
-            },
-          );
+        const employeeHeight = doc.heightOfString(employee, {
+          width: dayWidth - cellPadding * 2,
+          lineGap: 0,
+        });
 
         doc.text(
-          main,
+          employee,
           x + cellPadding,
           textY,
           {
-            width:
-              dayWidth -
-              cellPadding * 2,
-
+            width: dayWidth - cellPadding * 2,
             align: "center",
-
             lineGap: 0,
           },
         );
 
-        textY += mainHeight;
-
-        // ==================================================
-        // BACKUP EMPLOYEE — NORMAL
-        // ==================================================
-
-        if (backup) {
-
-          doc
-            .font("Helvetica")
-            .fontSize(employeeFontSize);
-
-          const backupHeight =
-            doc.heightOfString(
-              backup,
-              {
-                width:
-                  dayWidth -
-                  cellPadding * 2,
-
-                lineGap: 0,
-              },
-            );
-
-          doc.text(
-            backup,
-            x + cellPadding,
-            textY,
-            {
-              width:
-                dayWidth -
-                cellPadding * 2,
-
-              align: "center",
-
-              lineGap: 0,
-            },
-          );
-
-          textY += backupHeight;
-        }
+        textY += employeeHeight;
       });
     };
-
     // ==================================================
     // TITLE + FIRST HEADER
     // ==================================================

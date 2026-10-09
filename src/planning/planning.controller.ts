@@ -51,6 +51,7 @@ export class PlanningController {
     @Res() res: Response,
   ) {
     if (format === "pdf") {
+      console.log(":) ;)Exporting first week as PDF");
       return this.planningService.exportFirstWeekPdf(
         Number(year),
         Number(month),
@@ -59,6 +60,41 @@ export class PlanningController {
     }
 
     const workbook = await this.planningService.exportFirstWeek(
+      Number(year),
+      Number(month),
+    );
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="WeeklyPlanning.xlsx"',
+    );
+
+    await workbook.xlsx.write(res);
+    res.end();
+  }
+
+  @Get("export-first-week-manager")
+  async exportFirstWeekWithBackups(
+    @Query("year") year: string,
+    @Query("month") month: string,
+    @Query("format") format: string,
+    @Res() res: Response,
+  ) {
+    if (format === "pdf") {
+      console.log(":) ;)Exporting first week as PDF");
+      return this.planningService.exportFirstWeekPdfWithBackups(
+        Number(year),
+        Number(month),
+        res,
+      );
+    }
+
+    const workbook = await this.planningService.exportFirstWeekWithBackups(
       Number(year),
       Number(month),
     );
