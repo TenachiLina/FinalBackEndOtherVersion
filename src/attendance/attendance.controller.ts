@@ -4,6 +4,9 @@ import {
   Get,
   Post,
   Query,
+  Delete,
+  Param,
+  Patch,
 } from '@nestjs/common';
 import { AttendanceService } from './attendance.service';
 
@@ -12,6 +15,7 @@ export class AttendanceController {
   constructor(
     private readonly attendanceService: AttendanceService,
   ) {}
+
 
   @Post('sync')
   async sync() {
@@ -31,6 +35,12 @@ export class AttendanceController {
         message,
       };
     }
+  }
+
+
+  @Delete('device-logs/:id')
+  async deleteDeviceLog(@Param('id') id: string) {
+    return this.attendanceService.deleteDeviceLog(id);
   }
 
   /**
@@ -66,6 +76,17 @@ export class AttendanceController {
       };
     }
   }
+
+ @Patch('device-logs/:id')
+async updateDeviceLog(
+  @Param('id') id: string,
+  @Body() body: { timestamp: string },
+) {
+  return this.attendanceService.updateDeviceLog(
+    id,
+    body.timestamp,
+  );
+}
 
   /**
    * Get attendance logs.

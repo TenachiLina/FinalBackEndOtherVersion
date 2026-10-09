@@ -2,9 +2,10 @@ import {
   BadRequestException,
   Injectable,
   Logger,
+  NotFoundException,
 } from '@nestjs/common';
+import { Model, Types } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
 
 import { AttendanceDeviceService } from '../attendance-device/attendance-device.service';
 
@@ -33,6 +34,36 @@ export class AttendanceService {
 
     private deviceService: AttendanceDeviceService,
   ) {}
+
+ async updateDeviceLog(id: string, timestamp: string) {
+  if (!Types.ObjectId.isValid(id)) {
+    throw new BadRequestException('Invalid attendance log ID');
+  }
+
+  const date = new Date(timestamp);
+
+  if (!timestamp || Number.isNaN(date.getTime())) {
+    throw new BadRequestException('Invalid timestamp');
+  }
+
+  const updatedLog = await this.rawLogModel
+    .findByIdAndUpdate(
+      id,
+      { $set: { timestamp: date } },
+      { new: true, runValidators: true },
+    )
+    .exec();
+
+  if (!updatedLog) {
+    throw new NotFoundException('Attendance log not found');
+  }
+
+  return {
+    status: 'success',
+    message: 'Attendance time updated successfully',
+    data: updatedLog,
+  };
+}
 
   // ============================================================
   // SYNC LOGS FROM THE PHYSICAL ATTENDANCE DEVICE
@@ -259,4 +290,35 @@ export class AttendanceService {
       };
     });
   }
+
+  
+  async deleteDeviceLog(id: string) {
+    // Validate that the ID is a valid MongoDB ObjectId.
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException(
+        'Invalid attendance log ID',
+      );
+    }
+
+    // Delete the attendance log from MongoDB.
+    const deletedLog =
+      await this.rawLogModel.findByIdAndDelete(id).exec();
+
+    if (!deletedLog) {
+      throw new NotFoundException(
+        'Attendance log not found',
+      );
+    }
+
+    this.logger.log(
+      `Attendance log deleted — MongoDB ID: ${id}`,
+    );
+
+    return {
+      status: 'success',
+      message: 'Attendance log deleted successfully',
+      id,
+    };
+  }
+
 }
