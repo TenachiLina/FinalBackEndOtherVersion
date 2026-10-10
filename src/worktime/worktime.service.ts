@@ -1,101 +1,184 @@
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Worktime, WorktimeDocument } from './worktime.shema';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Worktime,
+  WorktimeDocument,
+} from './worktime.shema';
+import {
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 
 @Injectable()
 export class WorktimeService {
-  constructor(@InjectModel(Worktime.name) private worktimeModel: Model<WorktimeDocument>) { }
 
-  async create(data: Partial<Worktime>): Promise<WorktimeDocument> {
+  constructor(
+    @InjectModel(Worktime.name)
+    private worktimeModel: Model<WorktimeDocument>,
+  ) {}
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // CREATE
+  // ───────────────────────────────────────────────────────────────────────────
+
+  async create(
+    data: Partial<Worktime>,
+  ): Promise<WorktimeDocument> {
+
     return this.worktimeModel.create(data);
   }
-  // async findAll(query: Record<string, any> = {}): Promise<WorktimeDocument[]> {
-  //   const filter: Record<string, any> = {};
 
-  async findAll(query: Record<string, any> = {}): Promise<WorktimeDocument[]> {
+  // ───────────────────────────────────────────────────────────────────────────
+  // FIND ALL
+  // ───────────────────────────────────────────────────────────────────────────
+
+  async findAll(
+    query: Record<string, any> = {},
+  ): Promise<WorktimeDocument[]> {
+
     const filter: Record<string, any> = {};
 
-    if (query.emp_id) filter.emp_id = Number(query.emp_id);
-    if (query.shift_id) filter.shift_id = Number(query.shift_id);
-    if (query.work_date) filter.work_date = new Date(query.work_date);
+    // Employee
+    if (query.emp_id !== undefined) {
+      const empId = Number(query.emp_id);
 
-    return this.worktimeModel.find(filter).exec();
-  }
-  async findForReport(query: Record<string, any> = {}): Promise<WorktimeDocument[]> {
-    const filter: Record<string, any> = {};
-
-    if (query.emp_id || query.empId) {
-      filter.emp_id = Number(query.emp_id ?? query.empId);
+      if (!Number.isNaN(empId)) {
+        filter.emp_id = empId;
+      }
     }
 
-    if (query.start && query.end) {
+    // Shift
+    // IMPORTANT: shift_id is a STRING.
+    if (query.shift_id) {
+      filter.shift_id = String(query.shift_id);
+    }
+
+    // Work date
+    // Search the whole day instead of requiring an exact
+    // Date object match.
+    if (query.work_date) {
+
+      const start = new Date(
+        `${query.work_date}T00:00:00.000`,
+      );
+
+      const end = new Date(
+        `${query.work_date}T23:59:59.999`,
+      );
+
       filter.work_date = {
-        $gte: new Date(query.start),
-        $lte: new Date(query.end),
+        $gte: start,
+        $lte: end,
       };
     }
 
-    return this.worktimeModel.find(filter).exec();
+    return this.worktimeModel
+      .find(filter)
+      .sort({ work_date: 1 })
+      .exec();
   }
-  
-  // async findOne(id: string): Promise<WorktimeDocument | null> {
-  //   if (query.emp_id) {
-  //     const n = Number(query.emp_id);
 
-  //     if (!isNaN(n)) {
-  //       filter.emp_id = n;
-  //     }
-  //   }
+  // ───────────────────────────────────────────────────────────────────────────
+  // REPORT
+  // ───────────────────────────────────────────────────────────────────────────
 
-  //   if (query.shift_id) {
-  //     filter.shift_id = query.shift_id;
-  //   }
+  async findForReport(
+    query: Record<string, any> = {},
+  ): Promise<WorktimeDocument[]> {
 
-  //   if (query.work_date) {
-  //     const start = new Date(query.work_date);
-  //     start.setHours(0, 0, 0, 0);
+    const filter: Record<string, any> = {};
 
-  //     const end = new Date(query.work_date);
-  //     end.setHours(23, 59, 59, 999);
+    if (
+      query.emp_id !== undefined ||
+      query.empId !== undefined
+    ) {
 
-  //     filter.work_date = {
-  //       $gte: start,
-  //       $lte: end,
-  //     };
-  //   }
+      const empId = Number(
+        query.emp_id ?? query.empId,
+      );
 
-  //   return this.worktimeModel.find(filter).exec();
-  // }  
+      if (!Number.isNaN(empId)) {
+        filter.emp_id = empId;
+      }
+    }
 
-  async findOne(id: string): Promise<WorktimeDocument | null > {
-    return this.worktimeModel.findById(id).populate('empId').populate('shiftId').exec();
+    if (query.start && query.end) {
+
+      const start = new Date(
+        `${query.start}T00:00:00.000`,
+      );
+
+      const end = new Date(
+        `${query.end}T23:59:59.999`,
+      );
+
+      filter.work_date = {
+        $gte: start,
+        $lte: end,
+      };
+    }
+
+    return this.worktimeModel
+      .find(filter)
+      .sort({ work_date: 1 })
+      .exec();
   }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // FIND ONE
+  // ───────────────────────────────────────────────────────────────────────────
+
+  async findOne(
+    id: string,
+  ): Promise<WorktimeDocument | null> {
+
+    return this.worktimeModel
+      .findById(id)
+      .exec();
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // UPDATE
+  // ───────────────────────────────────────────────────────────────────────────
 
   async update(
-      id: string,
-      data: Partial<Worktime>
+    id: string,
+    data: Partial<Worktime>,
   ): Promise<WorktimeDocument> {
 
-      const updated = await this.worktimeModel
+    const updated =
+      await this.worktimeModel
         .findByIdAndUpdate(
           id,
-          data,
           {
-            returnDocument: 'after',
-          }
+            $set: data,
+          },
+          {
+            new: true,
+            runValidators: true,
+          },
         )
         .exec();
 
-      if (!updated) {
-        throw new NotFoundException(
-          `Worktime with id ${id} not found`
-        );
-      }
+    if (!updated) {
+      throw new NotFoundException(
+        `Worktime with id ${id} not found`,
+      );
+    }
 
-      return updated;
+    return updated;
   }
-  async remove(id: string): Promise<WorktimeDocument | null> {
-    return this.worktimeModel.findByIdAndDelete(id).exec();
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // DELETE
+  // ───────────────────────────────────────────────────────────────────────────
+
+  async remove(
+    id: string,
+  ): Promise<WorktimeDocument | null> {
+
+    return this.worktimeModel
+      .findByIdAndDelete(id)
+      .exec();
   }
 }
