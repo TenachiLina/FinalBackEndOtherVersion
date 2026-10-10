@@ -37,7 +37,7 @@ import { TasksModule } from './tasks/tasks.module';
 import { AdvancesModule } from './advances/advances.module';
 import { AttendanceDeviceModule } from './attendance-device/attendance-device.module'; // ← add
 import { AttendanceModule } from './attendance/attendance.module';                     // ← add
-
+import { BonusesModule } from './bonuses/bonus.module';
 
 @Module({
   imports: [
@@ -56,6 +56,7 @@ import { AttendanceModule } from './attendance/attendance.module';              
     AdvancesModule,   
     AttendanceDeviceModule, // ← add
     AttendanceModule,       // ← add
+    BonusesModule,
   ],
 })
 export class AppModule {}
