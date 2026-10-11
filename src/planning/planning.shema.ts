@@ -22,6 +22,10 @@ export class Planning {
   @Prop({ type: String, ref: 'Employee', required: true })
   empId!: string;
 
+  // NEW: many backups
+  @Prop({ type: [{ type: String, ref: 'Employee' }], default: [] })
+  backupEmpIds!: string[];
+  
   @Prop({ type: String, ref: 'Employee', default: null })
   backupEmpId?: string | null;
 

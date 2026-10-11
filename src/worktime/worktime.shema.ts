@@ -59,6 +59,14 @@ export class Worktime {
   // Absence reason
   @Prop()
   absent_comment?: string;
+
+  // Main Emmployee id
+  @Prop()
+  backup_for_emp_id?: number;
+
+  // Selected backup employee's employee number
+  @Prop({ type: Number, default: null })
+  backup_emp_id?: number | null;
 }
 
 export const WorktimeSchema =
