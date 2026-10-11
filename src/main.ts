@@ -14,13 +14,16 @@ async function bootstrap() {
     ...(process.env.FRONTEND_URL?.split(',').map((u) => u.trim()) ?? []),
   ];
 
+  // matches the production URL and every per-deployment/branch URL of this project
+  const vercelPattern =
+    /^https:\/\/final-front-end-other-version(-[a-z0-9-]+)?\.vercel\.app$/;
+
   app.enableCors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (Postman, curl, server-to-server)
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin || allowedOrigins.includes(origin) || vercelPattern.test(origin)) {
         return callback(null, true);
       }
-      return callback(new Error(`CORS blocked for origin: ${origin}`), false);
+      return callback(null, false);
     },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true,
