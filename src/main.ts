@@ -1,12 +1,19 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import * as dns from 'dns';
+import * as express from 'express';
 
 dns.setServers(['1.1.1.1', '8.8.8.8']);
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+   app.use(
+    express.text({
+      type: ['text/plain', 'application/octet-stream'],
+      limit: '1mb',
+    }),
+  );
   // Allowed frontend origins: local dev + any URLs from the FRONTEND_URL env var
   // (comma-separated, no trailing slashes)
   const allowedOrigins = [

@@ -38,6 +38,7 @@ import { AdvancesModule } from './advances/advances.module';
 import { AttendanceDeviceModule } from './attendance-device/attendance-device.module'; // ← add
 import { AttendanceModule } from './attendance/attendance.module';                     // ← add
 import { BonusesModule } from './bonuses/bonus.module';
+import { ZktecoModule } from './zkteco/zkteco.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { BonusesModule } from './bonuses/bonus.module';
     AttendanceDeviceModule, // ← add
     AttendanceModule,       // ← add
     BonusesModule,
+    ZktecoModule,
   ],
 })
 export class AppModule {}
