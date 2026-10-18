@@ -34,6 +34,8 @@ async function bootstrap() {
     },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true,
+    // lets the frontend read export file names
+    exposedHeaders: ['Content-Disposition'],
   });
 
   // Render provides the port via process.env.PORT; 0.0.0.0 lets it detect the open port

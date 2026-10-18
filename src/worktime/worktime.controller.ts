@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Put, Delete, Param, Body, Query } from '@nestjs/common';
 import { WorktimeService } from './worktime.service';
+import { Roles } from '../auth/auth.decorators';
 
 @Controller('worktime')
 export class WorktimeController {
@@ -12,6 +13,7 @@ export class WorktimeController {
     return this.worktimeService.findAll(query);
   }
 
+  @Roles('admin')
   @Get('report')
   findForReport(@Query() query: any) {
     return this.worktimeService.findForReport(query);

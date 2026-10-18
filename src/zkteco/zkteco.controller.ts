@@ -10,7 +10,10 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { ZktecoService } from './zkteco.service';
+import { Public } from '../auth/auth.decorators';
 
+// The ZKTeco device can't log in; it is authorized by its serial number instead.
+@Public()
 @Controller('iclock')
 export class ZktecoController {
   private readonly logger = new Logger(ZktecoController.name);
