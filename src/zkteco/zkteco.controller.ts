@@ -10,36 +10,53 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { ZktecoService } from './zkteco.service';
+import { CompaniesService } from '../companies/companies.service';
+import { setCurrentCompany } from '../tenancy/tenant-context';
 import { Public } from '../auth/auth.decorators';
 
-// The ZKTeco device can't log in; it is authorized by its serial number instead.
+// The ZKTeco device can't log in; it is authorized by its serial number instead,
+// which must be registered on exactly one company (Companies > devices).
 @Public()
 @Controller('iclock')
 export class ZktecoController {
   private readonly logger = new Logger(ZktecoController.name);
 
-  constructor(private readonly zktecoService: ZktecoService) {}
+  // UTC offset of the company the current request's device belongs to
+  private utcOffset = new Map<string, string>();
 
-  private authorize(serial: string | undefined, res: Response): boolean {
-    const expectedSerial = process.env.ZKTECO_DEVICE_SERIAL?.trim();
+  constructor(
+    private readonly zktecoService: ZktecoService,
+    private readonly companiesService: CompaniesService,
+  ) {}
 
-    // Fail closed if the expected serial has not been configured.
-    if (!expectedSerial || !serial || serial !== expectedSerial) {
+  private async authorize(
+    serial: string | undefined,
+    res: Response,
+  ): Promise<boolean> {
+    const company = serial?.trim()
+      ? await this.companiesService.findByDeviceSerial(serial.trim())
+      : null;
+
+    // Fail closed: unknown machines and suspended companies are rejected.
+    if (!company || !company.active || !company.features.includes('clockin')) {
       this.logger.warn(
-        `Rejected ADMS request; SN=${serial || 'missing'}; serial configured=${Boolean(expectedSerial)}`,
+        `Rejected ADMS request; SN=${serial || 'missing'}; company=${company ? String(company._id) : 'none'}`,
       );
       res.status(HttpStatus.FORBIDDEN).type('text/plain').send('ERROR');
       return false;
     }
+    // Everything this request saves belongs to the device's company.
+    setCurrentCompany(String(company._id));
+    this.utcOffset.set(serial!.trim(), company.settings?.utcOffset || '+01:00');
     return true;
   }
 
   @Get(['cdata', 'cdata.aspx'])
-  registration(
+  async registration(
     @Query('SN') serial: string | undefined,
     @Res() res: Response,
-  ): void {
-    if (!this.authorize(serial, res)) return;
+  ): Promise<void> {
+    if (!(await this.authorize(serial, res))) return;
 
     this.logger.log(`ADMS registration request from ${serial}`);
     // Standard-style ADMS options response. Confirm against the real device's
@@ -68,7 +85,7 @@ export class ZktecoController {
     @Req() req: Request,
     @Res() res: Response,
   ): Promise<void> {
-    if (!this.authorize(serial, res)) return;
+    if (!(await this.authorize(serial, res))) return;
 
     const body = req.body;
     if (typeof body !== 'string') {
@@ -85,7 +102,11 @@ export class ZktecoController {
 
     if (table === 'ATTLOG') {
       try {
-        const result = await this.zktecoService.saveAttlog(serial!, body);
+        const result = await this.zktecoService.saveAttlog(
+          serial!,
+          body,
+          this.utcOffset.get(serial!.trim()),
+        );
         if (result.rejected > 0) {
           // Do not acknowledge a partially malformed upload: the device may retry.
           // Successfully inserted rows remain safe because eventKey is unique.
@@ -110,20 +131,20 @@ export class ZktecoController {
   }
 
   @Get(['getrequest', 'getrequest.aspx'])
-  pollCommands(
+  async pollCommands(
     @Query('SN') serial: string | undefined,
     @Res() res: Response,
-  ): void {
-    if (!this.authorize(serial, res)) return;
+  ): Promise<void> {
+    if (!(await this.authorize(serial, res))) return;
     res.status(200).type('text/plain').send('OK');
   }
 
   @Get(['ping', 'ping.aspx'])
-  ping(
+  async ping(
     @Query('SN') serial: string | undefined,
     @Res() res: Response,
-  ): void {
-    if (!this.authorize(serial, res)) return;
+  ): Promise<void> {
+    if (!(await this.authorize(serial, res))) return;
     res.status(200).type('text/plain').send('OK');
   }
 }

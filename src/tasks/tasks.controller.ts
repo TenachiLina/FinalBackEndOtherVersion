@@ -1,6 +1,8 @@
 import { Controller, Get, Post, Put, Delete, Param, Body } from '@nestjs/common';
 import { TasksService } from './tasks.service';
+import { RequireFeature } from '../auth/auth.decorators';
 
+@RequireFeature('planning')
 @Controller('tasks')
 export class TasksController {
   constructor(private readonly tasksService: TasksService) {}

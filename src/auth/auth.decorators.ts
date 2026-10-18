@@ -3,25 +3,41 @@ import {
   ExecutionContext,
   SetMetadata,
 } from '@nestjs/common';
+import type { Feature } from '../companies/company.schema';
 
-export type Role = 'admin' | 'manager';
-export const ROLES: Role[] = ['admin', 'manager'];
+// superadmin: the product owner; manages companies and has no company of its own.
+// admin / manager: users inside one company.
+export type Role = 'superadmin' | 'admin' | 'manager';
+export const COMPANY_ROLES: Role[] = ['admin', 'manager'];
 
 export const IS_PUBLIC_KEY = 'isPublic';
 export const ROLES_KEY = 'roles';
+export const FEATURE_KEY = 'feature';
+export const NO_COMPANY_KEY = 'noCompany';
 
 // Skips authentication entirely (login, health check, attendance device).
 export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);
 
 // Restricts a route or controller to the given roles.
-// Without it, any logged-in user (admin or manager) can access the route.
+// Without it, any logged-in company user (admin or manager) can access the route.
+// A super admin working inside a company counts as that company's admin.
 export const Roles = (...roles: Role[]) => SetMetadata(ROLES_KEY, roles);
+
+// The route only works when the company has this feature switched on.
+export const RequireFeature = (feature: Feature) =>
+  SetMetadata(FEATURE_KEY, feature);
+
+// The route works without a company (e.g. a super admin's own account pages).
+export const AllowNoCompany = () => SetMetadata(NO_COMPANY_KEY, true);
 
 export interface AuthUser {
   id: string;
   email: string;
   name: string;
   role: Role;
+  // The company this request works for: the user's own company, or the one
+  // a super admin chose with the X-Company-Id header. Null otherwise.
+  companyId: string | null;
 }
 
 export const CurrentUser = createParamDecorator(

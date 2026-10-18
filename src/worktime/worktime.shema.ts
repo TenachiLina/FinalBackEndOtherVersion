@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
+import { tenantPlugin } from '../tenancy/tenant.plugin';
 
 export type WorktimeDocument = HydratedDocument<Worktime>;
 
@@ -71,3 +72,6 @@ export class Worktime {
 
 export const WorktimeSchema =
   SchemaFactory.createForClass(Worktime);
+
+// Each record belongs to one company; see tenancy/tenant.plugin.ts
+WorktimeSchema.plugin(tenantPlugin);

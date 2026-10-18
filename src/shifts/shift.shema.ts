@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
+import { tenantPlugin } from '../tenancy/tenant.plugin';
 
 export type ShiftDocument = Shift & Document;
 
@@ -11,3 +12,6 @@ export class Shift {
 }
 
 export const ShiftSchema = SchemaFactory.createForClass(Shift);
+
+// Each record belongs to one company; see tenancy/tenant.plugin.ts
+ShiftSchema.plugin(tenantPlugin);

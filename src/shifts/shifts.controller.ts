@@ -14,7 +14,9 @@
 
 import { Controller, Get, Post, Put, Patch, Delete, Param, Body, Query } from '@nestjs/common';
 import { ShiftsService } from './shifts.service';
+import { RequireFeature } from '../auth/auth.decorators';
 
+@RequireFeature('planning')
 @Controller('shifts')
 export class ShiftsController {
   constructor(private readonly shiftsService: ShiftsService) {}

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ZktecoController } from './zkteco.controller';
 import { ZktecoService } from './zkteco.service';
+import { CompaniesModule } from '../companies/companies.module';
 import {
   ZktecoAttendanceEvent,
   ZktecoAttendanceEventSchema,
@@ -9,6 +10,7 @@ import {
 
 @Module({
   imports: [
+    CompaniesModule,
     MongooseModule.forFeature([
       {
         name: ZktecoAttendanceEvent.name,

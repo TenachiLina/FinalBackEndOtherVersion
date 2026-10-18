@@ -9,7 +9,9 @@ import {
   Patch,
 } from '@nestjs/common';
 import { AttendanceService } from './attendance.service';
+import { RequireFeature } from '../auth/auth.decorators';
 
+@RequireFeature('clockin')
 @Controller('attendance')
 export class AttendanceController {
   constructor(

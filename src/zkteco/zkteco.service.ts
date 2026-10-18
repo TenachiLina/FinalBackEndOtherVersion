@@ -26,7 +26,11 @@ export class ZktecoService {
    * Save ATTLOG rows from an ADMS upload. We only persist ATTLOG data here;
    * other ADMS tables must not be mistaken for attendance events.
    */
-  async saveAttlog(serial: string, rawBody: string): Promise<ZktecoSaveResult> {
+  async saveAttlog(
+    serial: string,
+    rawBody: string,
+    utcOffset = '+01:00',
+  ): Promise<ZktecoSaveResult> {
     const lines = rawBody
       .replace(/\r/g, '')
       .split('\n')
@@ -55,7 +59,7 @@ export class ZktecoService {
       const status = Number(columns[2].trim());
       const verifyMode = Number(columns[3].trim());
       const workCode = columns[4]?.trim();
-      const eventTime = this.parseDeviceTimestamp(deviceTimestamp);
+      const eventTime = this.parseDeviceTimestamp(deviceTimestamp, utcOffset);
 
       if (
         !employeePin ||
@@ -119,7 +123,7 @@ export class ZktecoService {
     return result;
   }
 
-  private parseDeviceTimestamp(value: string): Date | null {
+  private parseDeviceTimestamp(value: string, utcOffset: string): Date | null {
     const match = value.match(
       /^(\d{4})-(\d{2})-(\d{2})[ ](\d{2}):(\d{2}):(\d{2})$/,
     );
@@ -133,21 +137,20 @@ export class ZktecoService {
     const minute = Number(mi);
     const second = Number(s);
 
-    // Default to Algeria's current fixed UTC+01:00 offset. Override via
-    // ZKTECO_UTC_OFFSET if the terminal is configured for another timezone.
-    const offset = process.env.ZKTECO_UTC_OFFSET || '+01:00';
+    // The offset comes from the company's settings (default +01:00, Algeria).
+    const offset = utcOffset;
     if (!/^[+-](0\d|1\d|2[0-3]):[0-5]\d$/.test(offset)) {
-      this.logger.error('Invalid ZKTECO_UTC_OFFSET; expected e.g. +01:00');
+      this.logger.error('Invalid company UTC offset; expected e.g. +01:00');
       return null;
     }
 
-    const date = new Date(
-      `${y}-${mo}-${d}T${h}:${mi}:${s}${offset}`,
-    );
+    const date = new Date(`${y}-${mo}-${d}T${h}:${mi}:${s}${offset}`);
     if (Number.isNaN(date.getTime())) return null;
 
     // Reject out-of-range calendar values instead of accepting JS normalization.
-    const localParts = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+    const localParts = new Date(
+      Date.UTC(year, month - 1, day, hour, minute, second),
+    );
     if (
       localParts.getUTCFullYear() !== year ||
       localParts.getUTCMonth() !== month - 1 ||

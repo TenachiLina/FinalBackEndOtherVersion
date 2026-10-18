@@ -5,10 +5,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import * as bcrypt from 'bcryptjs';
 import { User, UserDocument } from './user.schema';
-import { ROLES } from './auth.decorators';
+import { COMPANY_ROLES } from './auth.decorators';
 import type { Role } from './auth.decorators';
 
 export const MIN_PASSWORD_LENGTH = 8;
@@ -27,6 +27,10 @@ export interface UpdateUserInput {
   active?: boolean;
 }
 
+/**
+ * Company users. Every method takes the company it works in, so an admin of
+ * one company can never read or change another company's users.
+ */
 @Injectable()
 export class UsersService {
   constructor(@InjectModel(User.name) private userModel: Model<UserDocument>) {}
@@ -45,18 +49,39 @@ export class UsersService {
   }
 
   private validateRole(role: unknown): Role {
-    if (!ROLES.includes(role as Role)) {
-      throw new BadRequestException(`Role must be one of: ${ROLES.join(', ')}`);
+    if (!COMPANY_ROLES.includes(role as Role)) {
+      throw new BadRequestException(
+        `Role must be one of: ${COMPANY_ROLES.join(', ')}`,
+      );
     }
     return role as Role;
   }
 
-  findAll(): Promise<UserDocument[]> {
-    return this.userModel.find().sort({ createdAt: 1 }).exec();
+  private inCompany(companyId: string) {
+    return { companyId: new Types.ObjectId(companyId) };
   }
 
+  findAll(companyId: string): Promise<UserDocument[]> {
+    return this.userModel
+      .find(this.inCompany(companyId))
+      .sort({ createdAt: 1 })
+      .exec();
+  }
+
+  // Unscoped: used by the auth guard, which then checks the user's company.
   findById(id: string): Promise<UserDocument | null> {
+    if (!Types.ObjectId.isValid(id)) return Promise.resolve(null);
     return this.userModel.findById(id).exec();
+  }
+
+  private async findInCompany(id: string, companyId: string) {
+    const user = Types.ObjectId.isValid(id)
+      ? await this.userModel
+          .findOne({ _id: id, ...this.inCompany(companyId) })
+          .exec()
+      : null;
+    if (!user) throw new NotFoundException('User not found');
+    return user;
   }
 
   findByEmailWithPassword(email: string): Promise<UserDocument | null> {
@@ -66,22 +91,42 @@ export class UsersService {
       .exec();
   }
 
-  async create(input: CreateUserInput): Promise<UserDocument> {
+  async emailTaken(email: string): Promise<boolean> {
+    return !!(await this.userModel.exists({
+      email: email.trim().toLowerCase(),
+    }));
+  }
+
+  /** Creates a company user (admin or manager). */
+  create(companyId: string, input: CreateUserInput) {
+    return this.createUser(
+      input,
+      this.validateRole(input.role ?? 'manager'),
+      companyId,
+    );
+  }
+
+  private async createUser(
+    input: CreateUserInput,
+    role: Role,
+    companyId: string,
+  ): Promise<UserDocument> {
     const email = input.email?.trim().toLowerCase();
     const name = input.name?.trim();
-    if (!email || !EMAIL_RE.test(email))
+    if (!email || !EMAIL_RE.test(email)) {
       throw new BadRequestException('A valid email is required');
+    }
     if (!name) throw new BadRequestException('Name is required');
     const password = UsersService.validatePassword(input.password);
-    const role = this.validateRole(input.role ?? 'manager');
 
-    if (await this.userModel.exists({ email })) {
+    if (await this.emailTaken(email)) {
       throw new ConflictException('A user with this email already exists');
     }
     const user = await this.userModel.create({
       email,
       name,
       role,
+      companyId: new Types.ObjectId(companyId),
       passwordHash: await UsersService.hashPassword(password),
     });
     return (await this.findById(String(user._id)))!;
@@ -89,11 +134,11 @@ export class UsersService {
 
   async update(
     id: string,
+    companyId: string,
     actorId: string,
     input: UpdateUserInput,
   ): Promise<UserDocument> {
-    const user = await this.findById(id);
-    if (!user) throw new NotFoundException('User not found');
+    const user = await this.findInCompany(id, companyId);
 
     if (input.name !== undefined) {
       const name = String(input.name).trim();
@@ -103,23 +148,27 @@ export class UsersService {
     if (input.role !== undefined) user.role = this.validateRole(input.role);
     if (input.active !== undefined) user.active = Boolean(input.active);
 
-    // Never let an admin lock themselves out, and always keep at least one active admin.
+    // Never let an admin lock themselves out, and always keep one active admin.
     if (id === actorId && (user.role !== 'admin' || !user.active)) {
       throw new BadRequestException('You cannot remove your own admin access');
     }
-    await this.ensureAnotherActiveAdmin(user);
+    await this.ensureAnotherActiveAdmin(user, companyId);
 
     return user.save();
   }
 
-  async setPassword(id: string, password: unknown): Promise<void> {
+  async setPassword(id: string, password: unknown, companyId?: string) {
     const valid = UsersService.validatePassword(password);
-    const res = await this.userModel
-      .updateOne(
-        { _id: id },
-        { passwordHash: await UsersService.hashPassword(valid) },
-      )
-      .exec();
+    const filter = companyId
+      ? { _id: id, ...this.inCompany(companyId) }
+      : { _id: id };
+    const res = Types.ObjectId.isValid(id)
+      ? await this.userModel
+          .updateOne(filter, {
+            passwordHash: await UsersService.hashPassword(valid),
+          })
+          .exec()
+      : { matchedCount: 0 };
     if (res.matchedCount === 0) throw new NotFoundException('User not found');
   }
 
@@ -131,23 +180,34 @@ export class UsersService {
     return !!user && bcrypt.compare(password, user.passwordHash);
   }
 
-  async remove(id: string, actorId: string): Promise<void> {
-    if (id === actorId)
+  async remove(id: string, companyId: string, actorId: string) {
+    if (id === actorId) {
       throw new BadRequestException('You cannot delete your own account');
-    const user = await this.findById(id);
-    if (!user) throw new NotFoundException('User not found');
+    }
+    const user = await this.findInCompany(id, companyId);
     user.active = false; // treat as no longer an active admin for the check below
-    await this.ensureAnotherActiveAdmin(user);
+    await this.ensureAnotherActiveAdmin(user, companyId);
     await this.userModel.deleteOne({ _id: id }).exec();
   }
 
-  // Throws if saving `user` as-is would leave no active admin.
-  private async ensureAnotherActiveAdmin(user: UserDocument): Promise<void> {
+  // Throws if saving `user` as-is would leave its company with no active admin.
+  private async ensureAnotherActiveAdmin(
+    user: UserDocument,
+    companyId: string,
+  ) {
     if (user.role === 'admin' && user.active) return;
     const others = await this.userModel
-      .countDocuments({ _id: { $ne: user._id }, role: 'admin', active: true })
+      .countDocuments({
+        _id: { $ne: user._id },
+        ...this.inCompany(companyId),
+        role: 'admin',
+        active: true,
+      })
       .exec();
-    if (others === 0)
-      throw new BadRequestException('There must be at least one active admin');
+    if (others === 0) {
+      throw new BadRequestException(
+        'The company must keep at least one active admin',
+      );
+    }
   }
 }

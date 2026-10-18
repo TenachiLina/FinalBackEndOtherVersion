@@ -1,8 +1,10 @@
-import { Body, Controller, Get, HttpCode, Post } from '@nestjs/common';
-import { AuthService } from './auth.service';
-import { CurrentUser, Public } from './auth.decorators';
+import { Body, Controller, Get, HttpCode, Post, Req } from '@nestjs/common';
+import { AuthService, toCompanyInfo } from './auth.service';
+import { AllowNoCompany, CurrentUser, Public } from './auth.decorators';
 import type { AuthUser } from './auth.decorators';
 
+// A super admin uses these without picking a company.
+@AllowNoCompany()
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
@@ -15,8 +17,8 @@ export class AuthController {
   }
 
   @Get('me')
-  me(@CurrentUser() user: AuthUser) {
-    return user;
+  me(@CurrentUser() user: AuthUser, @Req() req: { company?: any }) {
+    return { user, company: toCompanyInfo(req.company ?? null) };
   }
 
   @Post('change-password')

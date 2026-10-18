@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
+import { tenantPlugin } from '../../tenancy/tenant.plugin';
 
 export type ZktecoAttendanceEventDocument =
   HydratedDocument<ZktecoAttendanceEvent>;
@@ -62,3 +63,6 @@ ZktecoAttendanceEventSchema.index(
   { deviceSerial: 1, eventTime: -1 },
   { name: 'zkteco_device_time' },
 );
+
+// Each record belongs to one company; see tenancy/tenant.plugin.ts
+ZktecoAttendanceEventSchema.plugin(tenantPlugin);

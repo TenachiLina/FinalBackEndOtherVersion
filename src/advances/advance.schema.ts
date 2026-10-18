@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
+import { tenantPlugin } from '../tenancy/tenant.plugin';
 
 export type AdvanceDocument = HydratedDocument<Advance>;
 
@@ -19,3 +20,6 @@ export class Advance {
 }
 
 export const AdvanceSchema = SchemaFactory.createForClass(Advance);
+
+// Each record belongs to one company; see tenancy/tenant.plugin.ts
+AdvanceSchema.plugin(tenantPlugin);

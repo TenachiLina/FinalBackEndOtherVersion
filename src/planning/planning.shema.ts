@@ -1,6 +1,7 @@
 // export const PlanningSchema = SchemaFactory.createForClass(Planning);
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
+import { tenantPlugin } from '../tenancy/tenant.plugin';
 
 export type PlanningDocument = Planning & Document;
 
@@ -46,3 +47,6 @@ export class Planning {
 }
 
 export const PlanningSchema = SchemaFactory.createForClass(Planning);
+
+// Each record belongs to one company; see tenancy/tenant.plugin.ts
+PlanningSchema.plugin(tenantPlugin);

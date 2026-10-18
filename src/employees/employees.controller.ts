@@ -13,7 +13,7 @@ import type { AuthUser } from '../auth/auth.decorators';
 
 // Managers need the employee list for planning and clock-in, but not salaries.
 function hideSalary(user: AuthUser, employee: any) {
-  if (!employee || user.role === 'admin') return employee;
+  if (!employee || user.role !== 'manager') return employee;
   const { baseSalary, ...rest } = employee.toObject
     ? employee.toObject()
     : employee;

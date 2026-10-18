@@ -11,8 +11,10 @@ import {
 } from '@nestjs/common';
 import { PlanningService } from './planning.service';
 import type { Response } from "express";
+import { RequireFeature } from '../auth/auth.decorators';
 
 
+@RequireFeature('planning')
 @Controller('planning')
 export class PlanningController {
   constructor(private readonly planningService: PlanningService) {}

@@ -1,18 +1,33 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
-import { ROLES } from './auth.decorators';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 import type { Role } from './auth.decorators';
 
 export type UserDocument = User & Document;
 
+// Not tenant-scoped by the plugin: login must find a user before the company is
+// known. UsersService filters by companyId itself.
 @Schema({ collection: 'users', timestamps: true })
 export class User {
+  // Emails are unique across all companies so login needs no company name.
   @Prop({ required: true, unique: true, lowercase: true, trim: true })
   email!: string;
   @Prop({ required: true, trim: true }) name!: string;
   // bcrypt hash, never returned by the API
   @Prop({ required: true, select: false }) passwordHash!: string;
-  @Prop({ required: true, enum: ROLES, default: 'manager' }) role!: Role;
+  @Prop({
+    required: true,
+    enum: ['superadmin', 'admin', 'manager'],
+    default: 'manager',
+  })
+  role!: Role;
+  // Null only for super admins.
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Company',
+    default: null,
+    index: true,
+  })
+  companyId!: Types.ObjectId | null;
   @Prop({ default: true }) active!: boolean;
 }
 

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   HttpException,
   HttpStatus,
   Injectable,
@@ -8,6 +9,8 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { UsersService } from './users.service';
+import { CompaniesService } from '../companies/companies.service';
+import type { CompanyDocument } from '../companies/company.schema';
 import type { UserDocument } from './user.schema';
 import type { AuthUser, Role } from './auth.decorators';
 
@@ -29,6 +32,19 @@ export function toAuthUser(user: UserDocument): AuthUser {
     email: user.email,
     name: user.name,
     role: user.role,
+    companyId: user.companyId ? String(user.companyId) : null,
+  };
+}
+
+/** What the frontend needs to know about the company it is working in. */
+export function toCompanyInfo(company: CompanyDocument | null) {
+  if (!company) return null;
+  return {
+    id: String(company._id),
+    name: company.name,
+    active: company.active,
+    features: company.features,
+    settings: company.settings,
   };
 }
 
@@ -40,6 +56,7 @@ export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
+    private readonly companiesService: CompaniesService,
   ) {}
 
   async login(email: unknown, password: unknown) {
@@ -68,10 +85,19 @@ export class AuthService {
     }
 
     this.failures.delete(key);
+    const company = user.companyId
+      ? await this.companiesService.findById(String(user.companyId), {
+          fresh: true,
+        })
+      : null;
+    if (user.role !== 'superadmin' && (!company || !company.active)) {
+      throw new ForbiddenException('This company account is suspended');
+    }
     const payload: JwtPayload = { sub: String(user._id), role: user.role };
     return {
       accessToken: await this.jwtService.signAsync(payload),
       user: toAuthUser(user),
+      company: toCompanyInfo(company),
     };
   }
 

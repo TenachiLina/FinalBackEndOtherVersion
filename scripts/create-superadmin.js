@@ -1,9 +1,12 @@
-// Creates the first admin account (or any admin) directly in the database.
+// Creates a super admin: the product owner's account. A super admin has no
+// company of its own; it creates customer companies and can open any of them.
 //
 // Usage (reads MONGODB_URI from .env):
-//   npm run create-admin
+//   npm run create-superadmin
 // You will be asked for the email, name and password. Or pass them as
 // environment variables: ADMIN_EMAIL, ADMIN_NAME, ADMIN_PASSWORD.
+//
+// Company admins are created from the app (Companies page), not with this script.
 
 const dns = require('dns');
 const readline = require('readline');
@@ -37,9 +40,9 @@ async function main() {
   if (!uri) throw new Error('MONGODB_URI is not set (check your .env file)');
 
   const email = (
-    process.env.ADMIN_EMAIL || (await ask('Admin email: '))
+    process.env.ADMIN_EMAIL || (await ask('Super admin email: '))
   ).toLowerCase();
-  const name = process.env.ADMIN_NAME || (await ask('Admin name: '));
+  const name = process.env.ADMIN_NAME || (await ask('Name: '));
   const password =
     process.env.ADMIN_PASSWORD || (await ask('Password (min 8 chars): ', true));
 
@@ -59,13 +62,14 @@ async function main() {
     email,
     name,
     passwordHash: await bcrypt.hash(password, 12),
-    role: 'admin',
+    role: 'superadmin',
+    companyId: null,
     active: true,
     createdAt: now,
     updatedAt: now,
   });
   console.log(
-    `Admin ${email} created in database "${mongoose.connection.name}".`,
+    `Super admin ${email} created in database "${mongoose.connection.name}".`,
   );
 }
 

@@ -9,9 +9,15 @@ import { AuthService } from './auth.service';
 import { AuthGuard } from './auth.guard';
 import { AuthController } from './auth.controller';
 import { UsersController } from './users.controller';
+import {
+  CompaniesController,
+  OwnCompanyController,
+} from './companies.controller';
+import { CompaniesModule } from '../companies/companies.module';
 
 @Module({
   imports: [
+    CompaniesModule,
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
     JwtModule.registerAsync({
       inject: [ConfigService],
@@ -31,7 +37,12 @@ import { UsersController } from './users.controller';
       },
     }),
   ],
-  controllers: [AuthController, UsersController],
+  controllers: [
+    AuthController,
+    UsersController,
+    CompaniesController,
+    OwnCompanyController,
+  ],
   providers: [
     UsersService,
     AuthService,

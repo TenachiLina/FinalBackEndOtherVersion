@@ -1,7 +1,8 @@
 import { Controller, Get, Post, Put, Delete, Param, Body, Query } from '@nestjs/common';
 import { WorktimeService } from './worktime.service';
-import { Roles } from '../auth/auth.decorators';
+import { RequireFeature, Roles } from '../auth/auth.decorators';
 
+@RequireFeature('clockin')
 @Controller('worktime')
 export class WorktimeController {
   constructor(private readonly worktimeService: WorktimeService) { }
@@ -14,6 +15,7 @@ export class WorktimeController {
   }
 
   @Roles('admin')
+  @RequireFeature('reporting')
   @Get('report')
   findForReport(@Query() query: any) {
     return this.worktimeService.findForReport(query);

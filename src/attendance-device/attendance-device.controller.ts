@@ -1,7 +1,9 @@
 // src/attendance-device/attendance-device.controller.ts
 import { Controller, Get } from '@nestjs/common';
 import { AttendanceDeviceService } from './attendance-device.service';
+import { RequireFeature } from '../auth/auth.decorators';
 
+@RequireFeature('clockin')
 @Controller('device')
 export class AttendanceDeviceController {
   constructor(private readonly deviceService: AttendanceDeviceService) {}

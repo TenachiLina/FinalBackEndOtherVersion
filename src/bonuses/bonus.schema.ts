@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
+import { tenantPlugin } from '../tenancy/tenant.plugin';
 
 @Schema({ timestamps: true })
 export class Bonus extends Document {
@@ -18,3 +19,6 @@ export class Bonus extends Document {
 }
 
 export const BonusSchema = SchemaFactory.createForClass(Bonus);
+
+// Each record belongs to one company; see tenancy/tenant.plugin.ts
+BonusSchema.plugin(tenantPlugin);
