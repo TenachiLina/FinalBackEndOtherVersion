@@ -4,6 +4,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import * as dns from 'dns';
 import * as express from 'express';
 import { tenantContextMiddleware } from './tenancy/tenant-context';
+import { AllExceptionsFilter } from './common/all-exceptions.filter';
 
 dns.setServers(['1.1.1.1', '8.8.8.8']);
 
@@ -11,6 +12,8 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   // Room for company logos sent as data URLs
   app.useBodyParser('json', { limit: '1mb' });
+  // Clear error messages instead of "Internal server error" (see common/)
+  app.useGlobalFilters(new AllExceptionsFilter());
 
   // Gives every request its own "current company" slot (see tenancy/).
   app.use(tenantContextMiddleware);
