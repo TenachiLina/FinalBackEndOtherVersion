@@ -8,6 +8,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import {
   Company,
+  CompanyBranding,
   CompanyDevice,
   CompanyDocument,
   CompanySettings,
@@ -21,6 +22,23 @@ export interface CompanyInput {
   features?: Feature[];
   settings?: Partial<CompanySettings>;
   devices?: CompanyDevice[];
+  slug?: string;
+  branding?: Partial<CompanyBranding>;
+}
+
+const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,48}[a-z0-9])?$/;
+const LOGO_RE = /^data:image\/(png|jpeg|webp|svg\+xml);base64,[A-Za-z0-9+/=]+$/;
+const MAX_LOGO_CHARS = 400_000; // ~300 KB image
+const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+
+export function slugify(name: string): string {
+  return name
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 50);
 }
 
 const UTC_OFFSET_RE = /^[+-](0\d|1\d|2[0-3]):[0-5]\d$/;
@@ -55,6 +73,12 @@ export class CompaniesService {
     return company;
   }
 
+  findBySlug(slug: string): Promise<CompanyDocument | null> {
+    return this.companyModel
+      .findOne({ slug: String(slug).trim().toLowerCase(), active: true })
+      .exec();
+  }
+
   findByDeviceSerial(serial: string): Promise<CompanyDocument | null> {
     return this.companyModel.findOne({ 'devices.serial': serial }).exec();
   }
@@ -77,6 +101,17 @@ export class CompaniesService {
   /** What a company's own admin may change: name and settings, not features or devices. */
   async updateOwn(id: string, input: CompanyInput): Promise<CompanyDocument> {
     return this.update(id, { name: input.name, settings: input.settings });
+  }
+
+  /** Branding for one company. Shown before login, so nothing sensitive. */
+  async publicBranding(slug: string) {
+    const company = await this.findBySlug(slug);
+    if (!company) throw new NotFoundException('Company not found');
+    return {
+      name: company.name,
+      slug: company.slug,
+      branding: company.branding ?? {},
+    };
   }
 
   private apply(company: CompanyDocument, input: CompanyInput) {
@@ -103,6 +138,23 @@ export class CompaniesService {
         ...input.settings,
       });
     }
+    if (input.slug !== undefined) {
+      const slug = String(input.slug).trim().toLowerCase();
+      if (!SLUG_RE.test(slug)) {
+        throw new BadRequestException(
+          'Sign-in link name: lowercase letters, numbers and dashes only',
+        );
+      }
+      company.slug = slug;
+    } else if (!company.slug) {
+      company.slug = slugify(company.name) || undefined;
+    }
+    if (input.branding !== undefined) {
+      company.branding = this.validateBranding({
+        ...this.plain(company.branding),
+        ...input.branding,
+      });
+    }
     if (input.devices !== undefined) {
       if (!Array.isArray(input.devices)) {
         throw new BadRequestException('Devices must be a list');
@@ -118,6 +170,39 @@ export class CompaniesService {
       }
       company.devices = devices;
     }
+  }
+
+  private plain<T>(value: T | undefined): T {
+    const v: any = value ?? {};
+    return typeof v.toObject === 'function' ? v.toObject() : { ...v };
+  }
+
+  private validateBranding(b: Partial<CompanyBranding>): CompanyBranding {
+    const text = (v: unknown, field: string, max: number) => {
+      const s = v == null ? '' : String(v).trim();
+      if (s.length > max) {
+        throw new BadRequestException(
+          `${field} must be at most ${max} characters`,
+        );
+      }
+      return s || undefined;
+    };
+    const logo = b.logo ? String(b.logo) : undefined;
+    if (logo && (!LOGO_RE.test(logo) || logo.length > MAX_LOGO_CHARS)) {
+      throw new BadRequestException(
+        'Logo must be a PNG, JPEG, WebP or SVG image under 300 KB',
+      );
+    }
+    const color = text(b.color, 'Colour', 7);
+    if (color && !COLOR_RE.test(color)) {
+      throw new BadRequestException('Colour must look like #1E40AF');
+    }
+    return {
+      logo,
+      title: text(b.title, 'Title', 80),
+      subtitle: text(b.subtitle, 'Subtitle', 200),
+      color,
+    };
   }
 
   private plainSettings(company: CompanyDocument): CompanySettings {
@@ -165,7 +250,7 @@ export class CompaniesService {
     } catch (err: any) {
       if (err?.code === 11000) {
         throw new ConflictException(
-          'One of these device serials is already used by another company',
+          'That sign-in link name or one of the device serials is already used by another company',
         );
       }
       throw err;

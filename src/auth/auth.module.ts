@@ -10,6 +10,7 @@ import { AuthGuard } from './auth.guard';
 import { AuthController } from './auth.controller';
 import { UsersController } from './users.controller';
 import {
+  BrandingController,
   CompaniesController,
   OwnCompanyController,
 } from './companies.controller';
@@ -42,6 +43,7 @@ import { CompaniesModule } from '../companies/companies.module';
     UsersController,
     CompaniesController,
     OwnCompanyController,
+    BrandingController,
   ],
   providers: [
     UsersService,

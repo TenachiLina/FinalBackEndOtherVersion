@@ -37,12 +37,30 @@ export class CompanyDevice {
 }
 export const CompanyDeviceSchema = SchemaFactory.createForClass(CompanyDevice);
 
+// How the company's sign-in page and sidebar look. Set by the super admin.
+@Schema({ _id: false })
+export class CompanyBranding {
+  // Small image as a data URL (data:image/png;base64,...), max ~300 KB
+  @Prop() logo?: string;
+  // Text on the sign-in page's side panel
+  @Prop({ trim: true }) title?: string;
+  @Prop({ trim: true }) subtitle?: string;
+  // Side panel background colour, #RRGGBB
+  @Prop({ trim: true }) color?: string;
+}
+export const CompanyBrandingSchema =
+  SchemaFactory.createForClass(CompanyBranding);
+
 export type CompanyDocument = Company & Document;
 
 // Not tenant-scoped: companies are managed by the super admin.
 @Schema({ collection: 'companies', timestamps: true })
 export class Company {
   @Prop({ required: true, trim: true }) name!: string;
+  // Used in the company's sign-in link: /signin?company=<slug>
+  @Prop({ trim: true, lowercase: true }) slug?: string;
+  @Prop({ type: CompanyBrandingSchema, default: () => ({}) })
+  branding!: CompanyBranding;
   @Prop({ default: true }) active!: boolean;
   @Prop({ type: [String], enum: FEATURES, default: () => [...FEATURES] })
   features!: Feature[];
@@ -53,6 +71,10 @@ export class Company {
 }
 
 export const CompanySchema = SchemaFactory.createForClass(Company);
+CompanySchema.index(
+  { slug: 1 },
+  { unique: true, partialFilterExpression: { slug: { $type: 'string' } } },
+);
 // A machine can only belong to one company.
 CompanySchema.index(
   { 'devices.serial': 1 },

@@ -42,6 +42,8 @@ export function toCompanyInfo(company: CompanyDocument | null) {
   return {
     id: String(company._id),
     name: company.name,
+    slug: company.slug ?? null,
+    branding: company.branding ?? {},
     active: company.active,
     features: company.features,
     settings: company.settings,

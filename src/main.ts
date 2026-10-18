@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import * as dns from 'dns';
 import * as express from 'express';
 import { tenantContextMiddleware } from './tenancy/tenant-context';
@@ -7,12 +8,14 @@ import { tenantContextMiddleware } from './tenancy/tenant-context';
 dns.setServers(['1.1.1.1', '8.8.8.8']);
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // Room for company logos sent as data URLs
+  app.useBodyParser('json', { limit: '1mb' });
 
   // Gives every request its own "current company" slot (see tenancy/).
   app.use(tenantContextMiddleware);
 
-   app.use(
+  app.use(
     express.text({
       type: ['text/plain', 'application/octet-stream'],
       limit: '1mb',
@@ -31,7 +34,11 @@ async function bootstrap() {
 
   app.enableCors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin) || vercelPattern.test(origin)) {
+      if (
+        !origin ||
+        allowedOrigins.includes(origin) ||
+        vercelPattern.test(origin)
+      ) {
         return callback(null, true);
       }
       return callback(null, false);

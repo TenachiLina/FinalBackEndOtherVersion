@@ -12,7 +12,7 @@ import type { CompanyInput } from '../companies/companies.service';
 import { FEATURES } from '../companies/company.schema';
 import { UsersService } from './users.service';
 import type { CreateUserInput } from './users.service';
-import { AllowNoCompany, CurrentUser, Roles } from './auth.decorators';
+import { AllowNoCompany, CurrentUser, Public, Roles } from './auth.decorators';
 import type { AuthUser } from './auth.decorators';
 import { toCompanyInfo } from './auth.service';
 
@@ -80,5 +80,16 @@ export class OwnCompanyController {
     return toCompanyInfo(
       await this.companiesService.updateOwn(user.companyId!, body ?? {}),
     );
+  }
+}
+
+/** Public: the sign-in page loads a company's logo and text before login. */
+@Public()
+@Controller('branding')
+export class BrandingController {
+  constructor(private readonly companiesService: CompaniesService) {}
+
+  @Get(':slug') get(@Param('slug') slug: string) {
+    return this.companiesService.publicBranding(slug);
   }
 }
