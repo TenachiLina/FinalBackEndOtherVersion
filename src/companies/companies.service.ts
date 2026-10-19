@@ -225,7 +225,12 @@ export class CompaniesService {
     if (!UTC_OFFSET_RE.test(String(s.utcOffset))) {
       throw new BadRequestException('UTC offset must look like +01:00');
     }
+    const language = String(s.language ?? 'en');
+    if (!['en', 'fr', 'ar'].includes(language)) {
+      throw new BadRequestException('Language must be en, fr or ar');
+    }
     return {
+      language,
       currency,
       utcOffset: String(s.utcOffset),
       hoursPerDay: positive(s.hoursPerDay, 'Hours per day', 24),

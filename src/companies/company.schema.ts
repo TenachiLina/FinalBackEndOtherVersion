@@ -17,6 +17,8 @@ export type Feature = (typeof FEATURES)[number];
 
 @Schema({ _id: false })
 export class CompanySettings {
+  // Language for people who haven't picked one themselves: en, fr or ar
+  @Prop({ default: 'en' }) language!: string;
   @Prop({ default: 'DA' }) currency!: string;
   // UTC offset of the company's clocking machines, e.g. "+01:00"
   @Prop({ default: '+01:00' }) utcOffset!: string;

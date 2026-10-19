@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { TenantContextError } from '../tenancy/tenant.plugin';
+import { pickLang, translateMessage } from './messages.i18n';
 
 // Field names as people say them, for messages like "first name is required".
 const FIELD_LABELS: Record<string, string> = {
@@ -58,13 +59,19 @@ export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger('Errors');
 
   catch(exception: unknown, host: ArgumentsHost) {
-    const res = host.switchToHttp().getResponse<Response>();
+    const http = host.switchToHttp();
+    const res = http.getResponse<Response>();
     if (res.headersSent) return;
     const { status, message } = this.translate(exception);
+    // Answer in the user's language (the app sends Accept-Language)
+    const lang = pickLang(http.getRequest()?.headers?.['accept-language']);
+    const localized = Array.isArray(message)
+      ? message.map((m) => translateMessage(m, lang))
+      : translateMessage(message, lang);
     res.status(status).json({
       statusCode: status,
       error: HttpStatus[status]?.replace(/_/g, ' ').toLowerCase() ?? 'error',
-      message,
+      message: localized,
     });
   }
 
