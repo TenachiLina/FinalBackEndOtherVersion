@@ -61,7 +61,7 @@ export class Worktime {
   @Prop()
   absent_comment?: string;
 
-  // Main Emmployee id
+  // Main employee id
   @Prop()
   backup_for_emp_id?: number;
 
