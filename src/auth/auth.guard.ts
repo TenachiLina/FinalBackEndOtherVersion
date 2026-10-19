@@ -10,6 +10,7 @@ import { JwtService } from '@nestjs/jwt';
 import {
   FEATURE_KEY,
   IS_PUBLIC_KEY,
+  KIOSK_KEY,
   NO_COMPANY_KEY,
   ROLES_KEY,
 } from './auth.decorators';
@@ -92,6 +93,13 @@ export class AuthGuard implements CanActivate {
     request.user = authUser;
     request.company = company;
     setCurrentCompany(companyId);
+
+    // Kiosk accounts are limited to the routes made for them.
+    if (user.role === 'employee' && !meta<boolean>(KIOSK_KEY)) {
+      throw new ForbiddenException(
+        'This account can only clock employees in and out',
+      );
+    }
 
     if (!companyId && !meta<boolean>(NO_COMPANY_KEY)) {
       throw new ForbiddenException('Choose a company first');

@@ -1,10 +1,16 @@
 import { Body, Controller, Get, HttpCode, Post, Req } from '@nestjs/common';
 import { AuthService, toCompanyInfo } from './auth.service';
-import { AllowNoCompany, CurrentUser, Public } from './auth.decorators';
+import {
+  AllowNoCompany,
+  CurrentUser,
+  KioskAllowed,
+  Public,
+} from './auth.decorators';
 import type { AuthUser } from './auth.decorators';
 
 // A super admin uses these without picking a company.
 @AllowNoCompany()
+@KioskAllowed()
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}

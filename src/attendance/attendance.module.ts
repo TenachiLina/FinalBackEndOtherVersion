@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 
 import { AttendanceService } from './attendance.service';
 import { AttendanceController } from './attendance.controller';
+import { KioskController } from './kiosk.controller';
 
 import {
   RawAttendanceLog,
@@ -34,6 +35,7 @@ import { AttendanceDeviceModule } from '../attendance-device/attendance-device.m
 
   controllers: [
     AttendanceController,
+    KioskController,
   ],
 
   providers: [
