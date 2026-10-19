@@ -16,10 +16,16 @@ import {
 } from '../employees/employee.shema';
 
 import { AttendanceDeviceModule } from '../attendance-device/attendance-device.module';
+import { WorktimeModule } from '../worktime/worktime.module';
+import { PlanningModule } from '../planning/planning.module';
+import { CompaniesModule } from '../companies/companies.module';
 
 @Module({
   imports: [
     AttendanceDeviceModule,
+    WorktimeModule,
+    PlanningModule,
+    CompaniesModule,
 
     MongooseModule.forFeature([
       {
