@@ -40,6 +40,8 @@ import { AttendanceModule } from './attendance/attendance.module';              
 import { BonusesModule } from './bonuses/bonus.module';
 import { ZktecoModule } from './zkteco/zkteco.module';
 import { AuthModule } from './auth/auth.module';
+import { AuditModule } from './audit/audit.module';
+import { ErrorLogsModule } from './error-logs/error-logs.module';
 
 @Module({
   imports: [
@@ -61,6 +63,8 @@ import { AuthModule } from './auth/auth.module';
     BonusesModule,
     ZktecoModule,
     AuthModule,
+    AuditModule,
+    ErrorLogsModule,
   ],
 })
 export class AppModule {}
