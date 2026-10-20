@@ -9,6 +9,8 @@ import {
 import type { Response } from 'express';
 import { TenantContextError } from '../tenancy/tenant.plugin';
 import { pickLang, translateMessage } from './messages.i18n';
+import { sanitize } from './sanitize';
+import { newReference, reportError } from '../error-logs/error-reporter';
 
 // Field names as people say them, for messages like "first name is required".
 const FIELD_LABELS: Record<string, string> = {
@@ -53,6 +55,8 @@ const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
  * - database errors (bad ID, missing field, duplicate) become 400/409 with a
  *   plain explanation instead of "Internal server error"
  * - anything unexpected is logged in full and answered with a generic 500
+ *   plus a reference code
+ * - errors are saved to the system error log (see error-logs/)
  */
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -62,9 +66,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const http = host.switchToHttp();
     const res = http.getResponse<Response>();
     if (res.headersSent) return;
+    const request = http.getRequest();
     const { status, message } = this.translate(exception);
+    // A code the user can pass on, to find this exact error in the log
+    const reference = status >= 500 ? newReference() : undefined;
+    this.record(exception, request, status, message, reference);
+
     // Answer in the user's language (the app sends Accept-Language)
-    const lang = pickLang(http.getRequest()?.headers?.['accept-language']);
+    const lang = pickLang(request?.headers?.['accept-language']);
     const localized = Array.isArray(message)
       ? message.map((m) => translateMessage(m, lang))
       : translateMessage(message, lang);
@@ -72,6 +81,55 @@ export class AllExceptionsFilter implements ExceptionFilter {
       statusCode: status,
       error: HttpStatus[status]?.replace(/_/g, ' ').toLowerCase() ?? 'error',
       message: localized,
+      ...(reference && { reference }),
+    });
+  }
+
+  /**
+   * Saves the error to the system error log with the request it came from.
+   * 5xx are errors (something broke); 4xx are warnings (the app refused
+   * something on purpose). Expired sessions and unknown URLs are skipped:
+   * they are normal and would drown the rest.
+   */
+  private record(
+    exception: unknown,
+    request: any,
+    status: number,
+    message: string | string[],
+    reference?: string,
+  ) {
+    if (!request) return;
+    if (status === 401 || (status === 404 && !request.route)) return;
+    const user = request.user;
+    const forwarded = request.headers?.['x-forwarded-for'];
+    reportError(exception, {
+      level: status >= 500 ? 'error' : 'warning',
+      source: 'request',
+      reference,
+      statusCode: status,
+      // For refusals, the message the user saw; for crashes, the real one
+      message:
+        status < 500
+          ? Array.isArray(message)
+            ? message.join('. ')
+            : message
+          : undefined,
+      method: request.method,
+      path: request.originalUrl?.split('?')[0],
+      route: request.route?.path,
+      query: sanitize(request.query),
+      body: sanitize(request.body),
+      userAgent: request.headers?.['user-agent'],
+      ip:
+        (typeof forwarded === 'string' && forwarded.split(',')[0].trim()) ||
+        request.ip,
+      ...(user && {
+        companyId: user.companyId,
+        userId: user.id,
+        userName: user.name,
+        userEmail: user.email,
+        userRole: user.role,
+      }),
     });
   }
 
