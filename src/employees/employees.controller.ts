@@ -1,5 +1,6 @@
 import {
   Controller,
+  ForbiddenException,
   Get,
   Post,
   Put,
@@ -8,43 +9,69 @@ import {
   Body,
 } from '@nestjs/common';
 import { EmployeesService } from './employees.service';
+import { ManagerVisibilityService } from './manager-visibility.service';
 import { CurrentUser, Roles } from '../auth/auth.decorators';
 import type { AuthUser } from '../auth/auth.decorators';
 
-// Managers need the employee list for planning and clock-in, but not salaries.
-function hideSalary(user: AuthUser, employee: any) {
-  if (!employee || user.role !== 'manager') return employee;
-  const { baseSalary, ...rest } = employee.toObject
+// Other managers stay listed (planning and clock-in need them), without their
+// salary or contact details, and flagged so salary pages can leave them out.
+function withoutPrivateFields(employee: any) {
+  const { baseSalary, address, phoneNumber, ...rest } = employee.toObject
     ? employee.toObject()
     : employee;
-  return rest;
+  return { ...rest, otherManager: true };
 }
 
 @Controller('employees')
 export class EmployeesController {
-  constructor(private readonly employeesService: EmployeesService) {}
+  constructor(
+    private readonly employeesService: EmployeesService,
+    private readonly visibility: ManagerVisibilityService,
+  ) {}
 
-  @Roles('admin') @Post() create(@Body() body: any) {
+  private async assertCanChange(user: AuthUser, id: string) {
+    if ((await this.visibility.hiddenFor(user)).ids.has(id)) {
+      throw new ForbiddenException(
+        "You can't see or change another manager's information",
+      );
+    }
+  }
+
+  @Roles('admin', 'manager') @Post() create(@Body() body: any) {
     return this.employeesService.create(body);
   }
   @Get() async findAll(@CurrentUser() user: AuthUser) {
-    return (await this.employeesService.findAll()).map((e) =>
-      hideSalary(user, e),
+    const [employees, hidden] = await Promise.all([
+      this.employeesService.findAll(),
+      this.visibility.hiddenFor(user),
+    ]);
+    return employees.map((e) =>
+      hidden.ids.has(String(e._id)) ? withoutPrivateFields(e) : e,
     );
   }
   @Get(':id') async findOne(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
   ) {
-    return hideSalary(user, await this.employeesService.findOne(id));
+    const employee = await this.employeesService.findOne(id);
+    if (employee && (await this.visibility.hiddenFor(user)).ids.has(id)) {
+      return withoutPrivateFields(employee);
+    }
+    return employee;
   }
-  @Roles('admin') @Put(':id') update(
+  @Roles('admin', 'manager') @Put(':id') async update(
+    @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Body() body: any,
   ) {
+    await this.assertCanChange(user, id);
     return this.employeesService.update(id, body);
   }
-  @Roles('admin') @Delete(':id') remove(@Param('id') id: string) {
+  @Roles('admin', 'manager') @Delete(':id') async remove(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+  ) {
+    await this.assertCanChange(user, id);
     return this.employeesService.remove(id);
   }
 }

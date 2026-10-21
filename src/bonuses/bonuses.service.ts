@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Bonus } from './bonus.schema';
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -33,6 +33,12 @@ export class BonusesService {
     }
     if (query.empId) filter.emp_id = Number(query.empId);
     return this.bonusModel.find(filter).sort({ date: -1, createdAt: -1 }).lean();
+  }
+
+  findOne(id: string) {
+    return Types.ObjectId.isValid(id)
+      ? this.bonusModel.findById(id).lean()
+      : Promise.resolve(null);
   }
 
   async remove(id: string) {

@@ -72,6 +72,14 @@ const EXACT: Record<string, Tr> = {
     ar: 'يوجد مستخدم بهذا البريد الإلكتروني بالفعل',
   },
   'User not found': { fr: 'Utilisateur introuvable', ar: 'المستخدم غير موجود' },
+  'This employee is already linked to another user': {
+    fr: 'Cet employé est déjà lié à un autre utilisateur',
+    ar: 'هذا الموظف مرتبط بالفعل بمستخدم آخر',
+  },
+  "You can't see or change another manager's information": {
+    fr: "Vous ne pouvez pas voir ni modifier les informations d'un autre responsable",
+    ar: 'لا يمكنك رؤية معلومات مسؤول آخر أو تعديلها',
+  },
   'You cannot remove your own admin access': {
     fr: 'Vous ne pouvez pas retirer votre propre accès administrateur',
     ar: 'لا يمكنك إزالة صلاحية المدير الخاصة بك',

@@ -1,11 +1,16 @@
 import { Controller, Get, Post, Put, Delete, Param, Body, Query } from '@nestjs/common';
 import { WorktimeService } from './worktime.service';
-import { RequireFeature, Roles } from '../auth/auth.decorators';
+import { CurrentUser, RequireFeature, Roles } from '../auth/auth.decorators';
+import type { AuthUser } from '../auth/auth.decorators';
+import { ManagerVisibilityService } from '../employees/manager-visibility.service';
 
 @RequireFeature('clockin')
 @Controller('worktime')
 export class WorktimeController {
-  constructor(private readonly worktimeService: WorktimeService) { }
+  constructor(
+    private readonly worktimeService: WorktimeService,
+    private readonly visibility: ManagerVisibilityService,
+  ) { }
 
   @Post() create(@Body() body: any) { return this.worktimeService.create(body); }
 
@@ -14,11 +19,14 @@ export class WorktimeController {
     return this.worktimeService.findAll(query);
   }
 
-  @Roles('admin')
+  @Roles('admin', 'manager')
   @RequireFeature('reporting')
   @Get('report')
-  findForReport(@Query() query: any) {
-    return this.worktimeService.findForReport(query);
+  async findForReport(@CurrentUser() user: AuthUser, @Query() query: any) {
+    return this.visibility.filterRecords(
+      user,
+      await this.worktimeService.findForReport(query),
+    );
   }
 
   @Get(':id') findOne(@Param('id') id: string) { return this.worktimeService.findOne(id); }

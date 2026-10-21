@@ -8,6 +8,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import * as bcrypt from 'bcryptjs';
 import { User, UserDocument } from './user.schema';
+import { Employee, EmployeeDocument } from '../employees/employee.shema';
 import { COMPANY_ROLES } from './auth.decorators';
 import type { Role } from './auth.decorators';
 
@@ -19,12 +20,14 @@ export interface CreateUserInput {
   name?: string;
   password?: string;
   role?: Role;
+  employeeId?: string | null;
 }
 
 export interface UpdateUserInput {
   name?: string;
   role?: Role;
   active?: boolean;
+  employeeId?: string | null;
 }
 
 /**
@@ -33,7 +36,10 @@ export interface UpdateUserInput {
  */
 @Injectable()
 export class UsersService {
-  constructor(@InjectModel(User.name) private userModel: Model<UserDocument>) {}
+  constructor(
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(Employee.name) private employeeModel: Model<EmployeeDocument>,
+  ) {}
 
   static hashPassword(password: string): Promise<string> {
     return bcrypt.hash(password, 12);
@@ -55,6 +61,38 @@ export class UsersService {
       );
     }
     return role as Role;
+  }
+
+  // Only managers are linked to an employee; one account per employee.
+  private async validateEmployeeLink(
+    employeeId: unknown,
+    role: Role,
+    companyId: string,
+    userId?: string,
+  ): Promise<Types.ObjectId | null> {
+    if (role !== 'manager' || employeeId == null || employeeId === '') {
+      return null;
+    }
+    const id = String(employeeId);
+    // The employees collection is company-scoped, so this only finds this
+    // company's employees.
+    if (
+      !Types.ObjectId.isValid(id) ||
+      !(await this.employeeModel.exists({ _id: id }))
+    ) {
+      throw new BadRequestException('Employee not found');
+    }
+    const taken = await this.userModel.exists({
+      ...this.inCompany(companyId),
+      employeeId: new Types.ObjectId(id),
+      ...(userId ? { _id: { $ne: new Types.ObjectId(userId) } } : {}),
+    });
+    if (taken) {
+      throw new ConflictException(
+        'This employee is already linked to another user',
+      );
+    }
+    return new Types.ObjectId(id);
   }
 
   private inCompany(companyId: string) {
@@ -122,10 +160,16 @@ export class UsersService {
     if (await this.emailTaken(email)) {
       throw new ConflictException('A user with this email already exists');
     }
+    const employeeId = await this.validateEmployeeLink(
+      input.employeeId,
+      role,
+      companyId,
+    );
     const user = await this.userModel.create({
       email,
       name,
       role,
+      employeeId,
       companyId: new Types.ObjectId(companyId),
       passwordHash: await UsersService.hashPassword(password),
     });
@@ -147,6 +191,14 @@ export class UsersService {
     }
     if (input.role !== undefined) user.role = this.validateRole(input.role);
     if (input.active !== undefined) user.active = Boolean(input.active);
+    if (input.employeeId !== undefined || input.role !== undefined) {
+      user.employeeId = await this.validateEmployeeLink(
+        input.employeeId !== undefined ? input.employeeId : user.employeeId,
+        user.role,
+        companyId,
+        id,
+      );
+    }
 
     // Never let an admin lock themselves out, and always keep one active admin.
     if (id === actorId && (user.role !== 'admin' || !user.active)) {
