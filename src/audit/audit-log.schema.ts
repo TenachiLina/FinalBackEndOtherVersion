@@ -31,6 +31,8 @@ export class AuditLog {
   @Prop({ required: true }) action!: string;
   @Prop() target?: string;
   @Prop() targetId?: string;
+  // What changed, field by field: [{ label, before, after }] (see audit-changes.ts)
+  @Prop({ type: MongooseSchema.Types.Mixed }) changes?: unknown;
   // The data that was sent, without passwords or images.
   @Prop({ type: MongooseSchema.Types.Mixed }) details?: unknown;
 
