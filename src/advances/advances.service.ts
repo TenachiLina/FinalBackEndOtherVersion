@@ -1,6 +1,6 @@
 import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Advance, AdvanceDocument } from './advance.schema';
 
 @Injectable()
@@ -54,6 +54,12 @@ export class AdvancesService {
     }
 
     return this.advanceModel.find(filter).sort({ date: -1 }).exec();
+  }
+
+  findOne(id: string): Promise<AdvanceDocument | null> {
+    return Types.ObjectId.isValid(id)
+      ? this.advanceModel.findById(id).exec()
+      : Promise.resolve(null);
   }
 
   /** Delete a specific advance by its own Mongo _id. */
