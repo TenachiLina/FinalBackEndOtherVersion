@@ -8,43 +8,28 @@ import {
   Body,
 } from '@nestjs/common';
 import { EmployeesService } from './employees.service';
-import { CurrentUser, Roles } from '../auth/auth.decorators';
-import type { AuthUser } from '../auth/auth.decorators';
-
-// Managers need the employee list for planning and clock-in, but not salaries.
-function hideSalary(user: AuthUser, employee: any) {
-  if (!employee || user.role !== 'manager') return employee;
-  const { baseSalary, ...rest } = employee.toObject
-    ? employee.toObject()
-    : employee;
-  return rest;
-}
+import { Roles } from '../auth/auth.decorators';
 
 @Controller('employees')
 export class EmployeesController {
   constructor(private readonly employeesService: EmployeesService) {}
 
-  @Roles('admin') @Post() create(@Body() body: any) {
+  @Roles('admin', 'manager') @Post() create(@Body() body: any) {
     return this.employeesService.create(body);
   }
-  @Get() async findAll(@CurrentUser() user: AuthUser) {
-    return (await this.employeesService.findAll()).map((e) =>
-      hideSalary(user, e),
-    );
+  @Get() findAll() {
+    return this.employeesService.findAll();
   }
-  @Get(':id') async findOne(
-    @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
-  ) {
-    return hideSalary(user, await this.employeesService.findOne(id));
+  @Get(':id') findOne(@Param('id') id: string) {
+    return this.employeesService.findOne(id);
   }
-  @Roles('admin') @Put(':id') update(
+  @Roles('admin', 'manager') @Put(':id') update(
     @Param('id') id: string,
     @Body() body: any,
   ) {
     return this.employeesService.update(id, body);
   }
-  @Roles('admin') @Delete(':id') remove(@Param('id') id: string) {
+  @Roles('admin', 'manager') @Delete(':id') remove(@Param('id') id: string) {
     return this.employeesService.remove(id);
   }
 }

@@ -2,7 +2,7 @@ import { Controller, Get, Post, Delete, Param, Body, Query } from '@nestjs/commo
 import { BonusesService } from './bonuses.service';
 import { Roles, RequireFeature } from '../auth/auth.decorators';
 
-@Roles('admin')
+@Roles('admin', 'manager')
 @RequireFeature('bonuses')
 @Controller('bonuses')
 export class BonusesController {

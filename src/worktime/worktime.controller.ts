@@ -14,7 +14,7 @@ export class WorktimeController {
     return this.worktimeService.findAll(query);
   }
 
-  @Roles('admin')
+  @Roles('admin', 'manager')
   @RequireFeature('reporting')
   @Get('report')
   findForReport(@Query() query: any) {

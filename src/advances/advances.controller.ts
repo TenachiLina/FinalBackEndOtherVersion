@@ -2,7 +2,7 @@ import { Controller, Get, Post, Delete, Param, Body, Query } from '@nestjs/commo
 import { AdvancesService } from './advances.service';
 import { Roles, RequireFeature } from '../auth/auth.decorators';
 
-@Roles('admin')
+@Roles('admin', 'manager')
 @RequireFeature('advances')
 @Controller('advances')
 export class AdvancesController {
