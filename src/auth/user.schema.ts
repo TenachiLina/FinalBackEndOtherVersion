@@ -29,6 +29,14 @@ export class User {
   })
   companyId!: Types.ObjectId | null;
   @Prop({ default: true }) active!: boolean;
+  // For a manager: the employee record that is this person. Other managers
+  // don't see that employee on salary pages (see ManagerVisibilityService).
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Employee',
+    default: null,
+  })
+  employeeId!: Types.ObjectId | null;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
