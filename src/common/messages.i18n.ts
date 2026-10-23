@@ -33,6 +33,46 @@ const EXACT: Record<string, Tr> = {
     ar: 'كلمة المرور الحالية غير صحيحة',
   },
   'Not logged in': { fr: "Vous n'êtes pas connecté", ar: 'لم تسجّل الدخول' },
+  'This session was ended. Please log in again.': {
+    fr: 'Cette session a été fermée. Veuillez vous reconnecter.',
+    ar: 'تم إنهاء هذه الجلسة. يرجى تسجيل الدخول مجددًا.',
+  },
+  'This session was ended for security reasons. Please log in again.': {
+    fr: 'Cette session a été fermée par sécurité. Veuillez vous reconnecter.',
+    ar: 'تم إنهاء هذه الجلسة لأسباب أمنية. يرجى تسجيل الدخول مجددًا.',
+  },
+  'Session already renewed': {
+    fr: 'Session déjà renouvelée',
+    ar: 'تم تجديد الجلسة بالفعل',
+  },
+  'Session not found': {
+    fr: 'Session introuvable',
+    ar: 'الجلسة غير موجودة',
+  },
+  'Too many requests. Please wait a moment and try again.': {
+    fr: 'Trop de requêtes. Patientez un instant puis réessayez.',
+    ar: 'طلبات كثيرة جدًا. انتظر قليلًا ثم حاول مرة أخرى.',
+  },
+  'HTTPS is required': {
+    fr: 'HTTPS est obligatoire',
+    ar: 'يجب استخدام HTTPS',
+  },
+  'Password is too long (72 characters max)': {
+    fr: 'Mot de passe trop long (72 caractères maximum)',
+    ar: 'كلمة المرور طويلة جدًا (72 حرفًا كحد أقصى)',
+  },
+  'Password must contain at least one letter and one number': {
+    fr: 'Le mot de passe doit contenir au moins une lettre et un chiffre',
+    ar: 'يجب أن تحتوي كلمة المرور على حرف ورقم على الأقل',
+  },
+  'This password is too easy to guess. Choose another one.': {
+    fr: 'Ce mot de passe est trop facile à deviner. Choisissez-en un autre.',
+    ar: 'كلمة المرور هذه سهلة التخمين. اختر كلمة أخرى.',
+  },
+  'The new password must be different from the current one': {
+    fr: "Le nouveau mot de passe doit être différent de l'actuel",
+    ar: 'يجب أن تختلف كلمة المرور الجديدة عن الحالية',
+  },
   'Session expired, please log in again': {
     fr: 'Session expirée, veuillez vous reconnecter',
     ar: 'انتهت الجلسة، يرجى تسجيل الدخول مجددًا',

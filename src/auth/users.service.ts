@@ -11,8 +11,19 @@ import { User, UserDocument } from './user.schema';
 import { Employee, EmployeeDocument } from '../employees/employee.shema';
 import { COMPANY_ROLES } from './auth.decorators';
 import type { Role } from './auth.decorators';
+import { SessionsService } from './sessions.service';
 
 export const MIN_PASSWORD_LENGTH = 8;
+// bcrypt ignores everything after 72 bytes, so longer passwords would give a
+// false sense of strength.
+export const MAX_PASSWORD_BYTES = 72;
+// Passwords attackers try first. Compared without case.
+const COMMON_PASSWORDS = new Set([
+  'password', 'password1', 'password123', 'passw0rd', '12345678', '123456789',
+  '1234567890', 'qwerty123', 'azerty123', 'abc12345', 'iloveyou1', 'admin123',
+  'welcome1', 'letmein1', '11111111', '00000000', 'motdepasse', 'motdepasse1',
+  'qwertyuiop', 'azertyuiop', 'changeme1', 'admin1234', 'test1234',
+]);
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export interface CreateUserInput {
@@ -39,16 +50,36 @@ export class UsersService {
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(Employee.name) private employeeModel: Model<EmployeeDocument>,
+    private readonly sessions: SessionsService,
   ) {}
 
   static hashPassword(password: string): Promise<string> {
     return bcrypt.hash(password, 12);
   }
 
-  static validatePassword(password: unknown): string {
+  /** Password rules, checked on the server whatever the app sends. */
+  static validatePassword(password: unknown, email?: string): string {
     if (typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH) {
       throw new BadRequestException(
         `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
+      );
+    }
+    if (Buffer.byteLength(password, 'utf8') > MAX_PASSWORD_BYTES) {
+      throw new BadRequestException('Password is too long (72 characters max)');
+    }
+    if (!/\p{L}/u.test(password) || !/\d/.test(password)) {
+      throw new BadRequestException(
+        'Password must contain at least one letter and one number',
+      );
+    }
+    const lower = password.toLowerCase();
+    const emailName = email?.split('@')[0]?.toLowerCase();
+    if (
+      COMMON_PASSWORDS.has(lower) ||
+      (emailName && emailName.length >= 4 && lower.includes(emailName))
+    ) {
+      throw new BadRequestException(
+        'This password is too easy to guess. Choose another one.',
       );
     }
     return password;
@@ -125,7 +156,7 @@ export class UsersService {
   findByEmailWithPassword(email: string): Promise<UserDocument | null> {
     return this.userModel
       .findOne({ email: email.trim().toLowerCase() })
-      .select('+passwordHash')
+      .select('+passwordHash +lockedUntil')
       .exec();
   }
 
@@ -155,7 +186,7 @@ export class UsersService {
       throw new BadRequestException('A valid email is required');
     }
     if (!name) throw new BadRequestException('Name is required');
-    const password = UsersService.validatePassword(input.password);
+    const password = UsersService.validatePassword(input.password, email);
 
     if (await this.emailTaken(email)) {
       throw new ConflictException('A user with this email already exists');
@@ -172,6 +203,7 @@ export class UsersService {
       employeeId,
       companyId: new Types.ObjectId(companyId),
       passwordHash: await UsersService.hashPassword(password),
+      passwordChangedAt: new Date(),
     });
     return (await this.findById(String(user._id)))!;
   }
@@ -183,6 +215,8 @@ export class UsersService {
     input: UpdateUserInput,
   ): Promise<UserDocument> {
     const user = await this.findInCompany(id, companyId);
+    const roleBefore = user.role;
+    const activeBefore = user.active;
 
     if (input.name !== undefined) {
       const name = String(input.name).trim();
@@ -206,22 +240,41 @@ export class UsersService {
     }
     await this.ensureAnotherActiveAdmin(user, companyId);
 
-    return user.save();
+    const saved = await user.save();
+    // A changed role or a disabled account signs the person out everywhere,
+    // so no token keeps working with the old rights.
+    if (!saved.active && activeBefore) {
+      await this.sessions.revokeAllForUser(id, 'account_disabled', { by: actorId });
+    } else if (saved.role !== roleBefore) {
+      await this.sessions.revokeAllForUser(id, 'role_changed', { by: actorId });
+    }
+    return saved;
   }
 
+  /**
+   * Sets a new password. Doesn't end sessions: callers decide (an admin reset
+   * ends them all, changing your own keeps the current one).
+   */
   async setPassword(id: string, password: unknown, companyId?: string) {
-    const valid = UsersService.validatePassword(password);
     const filter = companyId
       ? { _id: id, ...this.inCompany(companyId) }
       : { _id: id };
-    const res = Types.ObjectId.isValid(id)
-      ? await this.userModel
-          .updateOne(filter, {
-            passwordHash: await UsersService.hashPassword(valid),
-          })
-          .exec()
-      : { matchedCount: 0 };
-    if (res.matchedCount === 0) throw new NotFoundException('User not found');
+    const user = Types.ObjectId.isValid(id)
+      ? await this.userModel.findOne(filter).exec()
+      : null;
+    if (!user) throw new NotFoundException('User not found');
+    const valid = UsersService.validatePassword(password, user.email);
+    await this.userModel
+      .updateOne(
+        { _id: user._id },
+        {
+          passwordHash: await UsersService.hashPassword(valid),
+          passwordChangedAt: new Date(),
+          failedLoginAttempts: 0,
+          lockedUntil: null,
+        },
+      )
+      .exec();
   }
 
   async verifyPassword(id: string, password: string): Promise<boolean> {
@@ -240,6 +293,35 @@ export class UsersService {
     user.active = false; // treat as no longer an active admin for the check below
     await this.ensureAnotherActiveAdmin(user, companyId);
     await this.userModel.deleteOne({ _id: id }).exec();
+    await this.sessions.revokeAllForUser(id, 'account_deleted', { by: actorId });
+  }
+
+  // ── Brute-force protection (used by AuthService.login) ──────────────────
+
+  /** Counts a wrong password; locks the account after `max` in a row. */
+  async recordFailedLogin(id: Types.ObjectId, max: number, lockMs: number) {
+    const user = await this.userModel
+      .findOneAndUpdate(
+        { _id: id },
+        { $inc: { failedLoginAttempts: 1 } },
+        { new: true },
+      )
+      .select('+failedLoginAttempts')
+      .exec();
+    if (user && user.failedLoginAttempts >= max) {
+      await this.userModel
+        .updateOne(
+          { _id: id },
+          { failedLoginAttempts: 0, lockedUntil: new Date(Date.now() + lockMs) },
+        )
+        .exec();
+    }
+  }
+
+  async clearFailedLogins(id: Types.ObjectId) {
+    await this.userModel
+      .updateOne({ _id: id }, { failedLoginAttempts: 0, lockedUntil: null })
+      .exec();
   }
 
   // Throws if saving `user` as-is would leave its company with no active admin.

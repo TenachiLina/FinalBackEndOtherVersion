@@ -96,3 +96,37 @@ Nest is an MIT-licensed open source project. It can grow thanks to the sponsors 
 ## License
 
 Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+
+## Security
+
+Automated checks: `npm run test:security` (uses a throw-away in-memory MongoDB).
+
+### HTTPS
+
+Production (Render): Render serves HTTPS; the app trusts its proxy (`TRUST_PROXY`,
+default 1 hop in production), redirects/refuses plain HTTP (`FORCE_HTTPS`, on by
+default in production) and sends HSTS. `FRONTEND_URL` must use `https://`.
+The ZKTeco machine (`/iclock/*`) is the only plain-HTTP exception.
+
+Local development over HTTPS:
+
+1. In the frontend folder run `npm run dev:https` once. Next.js creates a
+   trusted certificate for `localhost` in `certificates/` (it installs a local
+   certificate authority with mkcert; Windows asks you to confirm).
+2. In this backend's `.env`:
+   ```
+   SSL_CERT_PATH=../../FinalVersion2-Front/certificates/localhost.pem
+   SSL_KEY_PATH=../../FinalVersion2-Front/certificates/localhost-key.pem
+   ```
+   (paths are relative to the folder you run `npm run start:dev` from)
+3. In the frontend's `.env.local`: `NEXT_PUBLIC_API_BASE_URL=https://localhost:3001`
+4. Open https://localhost:3000.
+
+### Sessions and tokens
+
+- Sign-in creates a record in `login_sessions` (device, IP, current token id,
+  expiry, renewals, end reason) and returns an access token (15 min) and a
+  refresh token.
+- The app renews both tokens automatically; each refresh token works once.
+  Reusing an old one ends the session (stolen token).
+- `ACCESS_TOKEN_TTL`, `SESSION_IDLE_TIMEOUT`, `SESSION_MAX_AGE` tune the timings.

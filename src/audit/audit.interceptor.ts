@@ -12,6 +12,7 @@ import { AuditService } from './audit.service';
 import type { AuditEntry } from './audit.service';
 import { actionFor, describeTarget, SKIP_AUDIT_KEY } from './audit-actions';
 import { sanitize } from '../common/sanitize';
+import { clientInfo } from '../auth/client-info';
 import { AuditChanges } from './audit-changes';
 import type { Snapshot } from './audit-changes';
 
@@ -49,16 +50,14 @@ export class AuditInterceptor implements NestInterceptor {
     // Public routes other than login have no user to log.
     if (!actor && !isLogin) return next.handle();
 
-    const forwarded = request.headers['x-forwarded-for'];
     const base = {
       action,
       method: request.method,
       path: request.originalUrl?.split('?')[0] ?? route,
       targetId: request.params?.id,
       details: isLogin ? undefined : sanitize(request.body),
-      ip:
-        (typeof forwarded === 'string' && forwarded.split(',')[0].trim()) ||
-        request.ip,
+      // From the trusted proxy setting, so it can't be faked by the client
+      ip: clientInfo(request).ip,
     };
     const who = (user?: Partial<AuthUser> | null) => ({
       companyId: user?.companyId ?? null,

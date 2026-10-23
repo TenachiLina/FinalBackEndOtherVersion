@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   CanActivate,
   ExecutionContext,
   ForbiddenException,
@@ -6,7 +7,8 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { JwtService } from '@nestjs/jwt';
+import { JwtService, TokenExpiredError } from '@nestjs/jwt';
+import { Types } from 'mongoose';
 import {
   FEATURE_KEY,
   IS_PUBLIC_KEY,
@@ -15,19 +17,25 @@ import {
   ROLES_KEY,
 } from './auth.decorators';
 import type { AuthUser, Role } from './auth.decorators';
-import type { JwtPayload } from './auth.service';
+import { SessionsService } from './sessions.service';
+import type { JwtPayload } from './sessions.service';
 import { UsersService } from './users.service';
+import { AUTH_CODES } from './security.config';
+import { clientInfo } from './client-info';
 import { CompaniesService } from '../companies/companies.service';
 import type { Feature } from '../companies/company.schema';
 import { setCurrentCompany } from '../tenancy/tenant-context';
 
 /**
  * Registered globally. For every route that is not @Public():
- * 1. checks the login token and that the user is still active
- * 2. works out the company (the user's own, or the one a super admin picked
+ * 1. checks the login token (signature, expiry, issuer) and that its login
+ *    session is still open and expects this exact token
+ * 2. checks the user is still active, and takes their role from the
+ *    database: nothing the browser sends can change it
+ * 3. works out the company (the user's own, or the one a super admin picked
  *    with the X-Company-Id header) and makes all data access use it
- * 3. checks the company is active and has the route's feature switched on
- * 4. checks the user's role
+ * 4. checks the company is active and has the route's feature switched on
+ * 5. checks the user's role
  */
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -36,6 +44,7 @@ export class AuthGuard implements CanActivate {
     private readonly jwtService: JwtService,
     private readonly usersService: UsersService,
     private readonly companiesService: CompaniesService,
+    private readonly sessions: SessionsService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -53,20 +62,34 @@ export class AuthGuard implements CanActivate {
     let payload: JwtPayload;
     try {
       payload = await this.jwtService.verifyAsync<JwtPayload>(token);
-    } catch {
-      throw new UnauthorizedException('Session expired, please log in again');
+    } catch (err) {
+      throw new UnauthorizedException({
+        message: 'Session expired, please log in again',
+        code:
+          err instanceof TokenExpiredError
+            ? AUTH_CODES.tokenExpired
+            : AUTH_CODES.tokenInvalid,
+      });
     }
+    // The session must still be open and expect this exact token.
+    const session = await this.sessions.checkAccess(payload, clientInfo(request));
 
     // Load the user on every request so deactivations and role changes apply immediately.
     const user = await this.usersService.findById(payload.sub);
     if (!user || !user.active) {
-      throw new UnauthorizedException('Account is disabled');
+      throw new UnauthorizedException({
+        message: 'Account is disabled',
+        code: AUTH_CODES.sessionEnded,
+      });
     }
 
     let companyId: string | null;
     if (user.role === 'superadmin') {
       const picked = request.headers['x-company-id'];
       companyId = typeof picked === 'string' && picked ? picked : null;
+      if (companyId && !Types.ObjectId.isValid(companyId)) {
+        throw new BadRequestException('This link or record ID is not valid');
+      }
     } else {
       companyId = user.companyId ? String(user.companyId) : null;
       if (!companyId)
@@ -89,6 +112,7 @@ export class AuthGuard implements CanActivate {
       name: user.name,
       role: user.role,
       companyId,
+      sessionId: String(session._id),
     };
     request.user = authUser;
     request.company = company;
