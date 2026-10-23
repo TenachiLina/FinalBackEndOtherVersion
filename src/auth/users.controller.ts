@@ -9,6 +9,7 @@ import {
   Post,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
+import { SessionsService } from './sessions.service';
 import type { CreateUserInput, UpdateUserInput } from './users.service';
 import { CurrentUser, Roles } from './auth.decorators';
 import type { AuthUser } from './auth.decorators';
@@ -17,7 +18,10 @@ import type { AuthUser } from './auth.decorators';
 @Roles('admin')
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly sessions: SessionsService,
+  ) {}
 
   @Get() findAll(@CurrentUser() actor: AuthUser) {
     return this.usersService.findAll(actor.companyId!);
@@ -47,6 +51,8 @@ export class UsersController {
     @Body() body: { password?: string },
   ) {
     await this.usersService.setPassword(id, body?.password, actor.companyId!);
+    // Whoever knew the old password is signed out everywhere.
+    await this.sessions.revokeAllForUser(id, 'password_reset', { by: actor.id });
   }
 
   @Delete(':id')

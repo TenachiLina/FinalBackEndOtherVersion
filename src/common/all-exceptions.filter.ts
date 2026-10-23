@@ -10,6 +10,7 @@ import type { Response } from 'express';
 import { TenantContextError } from '../tenancy/tenant.plugin';
 import { pickLang, translateMessage } from './messages.i18n';
 import { sanitize } from './sanitize';
+import { clientInfo } from '../auth/client-info';
 import { newReference, reportError } from '../error-logs/error-reporter';
 
 // Field names as people say them, for messages like "first name is required".
@@ -67,7 +68,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const res = http.getResponse<Response>();
     if (res.headersSent) return;
     const request = http.getRequest();
-    const { status, message } = this.translate(exception);
+    const { status, message, code } = this.translate(exception);
     // A code the user can pass on, to find this exact error in the log
     const reference = status >= 500 ? newReference() : undefined;
     this.record(exception, request, status, message, reference);
@@ -81,6 +82,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       statusCode: status,
       error: HttpStatus[status]?.replace(/_/g, ' ').toLowerCase() ?? 'error',
       message: localized,
+      ...(code && { code }),
       ...(reference && { reference }),
     });
   }
@@ -101,7 +103,6 @@ export class AllExceptionsFilter implements ExceptionFilter {
     if (!request) return;
     if (status === 401 || (status === 404 && !request.route)) return;
     const user = request.user;
-    const forwarded = request.headers?.['x-forwarded-for'];
     reportError(exception, {
       level: status >= 500 ? 'error' : 'warning',
       source: 'request',
@@ -120,9 +121,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       query: sanitize(request.query),
       body: sanitize(request.body),
       userAgent: request.headers?.['user-agent'],
-      ip:
-        (typeof forwarded === 'string' && forwarded.split(',')[0].trim()) ||
-        request.ip,
+      ip: clientInfo(request).ip,
       ...(user && {
         companyId: user.companyId,
         userId: user.id,
@@ -133,9 +132,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
     });
   }
 
-  private translate(e: any): { status: number; message: string | string[] } {
+  private translate(e: any): {
+    status: number;
+    message: string | string[];
+    code?: string;
+  } {
     if (e instanceof HttpException) {
       const body = e.getResponse() as any;
+      // A machine-readable reason, e.g. TOKEN_EXPIRED (see auth/security.config.ts)
+      const code = typeof body?.code === 'string' ? body.code : undefined;
       const message =
         typeof body === 'string' ? body : (body?.message ?? e.message);
       // Nest reports unreadable request bodies with the JSON parser's own text
@@ -146,7 +151,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       ) {
         return { status: 400, message: 'The data sent was not valid' };
       }
-      return { status: e.getStatus(), message };
+      return { status: e.getStatus(), message, code };
     }
 
     if (e instanceof TenantContextError) {

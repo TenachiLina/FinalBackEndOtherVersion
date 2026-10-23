@@ -15,6 +15,7 @@ export class User {
   // bcrypt hash, never returned by the API
   @Prop({ required: true, select: false }) passwordHash!: string;
   @Prop({
+    type: String,
     required: true,
     enum: ['superadmin', 'admin', 'manager', 'employee'],
     default: 'manager',
@@ -37,6 +38,13 @@ export class User {
     default: null,
   })
   employeeId!: Types.ObjectId | null;
+
+  // Brute-force protection: wrong passwords in a row, and until when the
+  // account refuses sign-in after too many. Never returned by the API.
+  @Prop({ default: 0, select: false }) failedLoginAttempts!: number;
+  @Prop({ type: Date, default: null, select: false })
+  lockedUntil!: Date | null;
+  @Prop({ type: Date, default: null }) passwordChangedAt!: Date | null;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

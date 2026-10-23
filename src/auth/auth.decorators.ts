@@ -44,6 +44,8 @@ export interface AuthUser {
   // The company this request works for: the user's own company, or the one
   // a super admin chose with the X-Company-Id header. Null otherwise.
   companyId: string | null;
+  // The login session this request belongs to (see SessionsService)
+  sessionId?: string;
 }
 
 export const CurrentUser = createParamDecorator(

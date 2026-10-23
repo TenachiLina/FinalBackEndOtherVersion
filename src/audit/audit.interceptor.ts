@@ -6,12 +6,15 @@ import {
   NestInterceptor,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { Observable, tap } from 'rxjs';
+import { from, Observable, switchMap, tap } from 'rxjs';
 import type { AuthUser } from '../auth/auth.decorators';
 import { AuditService } from './audit.service';
 import type { AuditEntry } from './audit.service';
 import { actionFor, describeTarget, SKIP_AUDIT_KEY } from './audit-actions';
 import { sanitize } from '../common/sanitize';
+import { clientInfo } from '../auth/client-info';
+import { AuditChanges } from './audit-changes';
+import type { Snapshot } from './audit-changes';
 
 const LOGGED_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
@@ -20,12 +23,16 @@ const LOGGED_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
  * makes (create, update, delete, clock-in, login…), whether it worked or not.
  * Reads are not logged. Runs after the auth guard, so requests refused for
  * lack of login or permission never reach it.
+ *
+ * For edits and deletes, the record is read before the action runs so the
+ * log can show exactly what changed (see audit-changes.ts).
  */
 @Injectable()
 export class AuditInterceptor implements NestInterceptor {
   constructor(
     private readonly reflector: Reflector,
     private readonly audit: AuditService,
+    private readonly changes: AuditChanges,
   ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
@@ -43,16 +50,14 @@ export class AuditInterceptor implements NestInterceptor {
     // Public routes other than login have no user to log.
     if (!actor && !isLogin) return next.handle();
 
-    const forwarded = request.headers['x-forwarded-for'];
     const base = {
       action,
       method: request.method,
       path: request.originalUrl?.split('?')[0] ?? route,
       targetId: request.params?.id,
       details: isLogin ? undefined : sanitize(request.body),
-      ip:
-        (typeof forwarded === 'string' && forwarded.split(',')[0].trim()) ||
-        request.ip,
+      // From the trusted proxy setting, so it can't be faked by the client
+      ip: clientInfo(request).ip,
     };
     const who = (user?: Partial<AuthUser> | null) => ({
       companyId: user?.companyId ?? null,
@@ -62,31 +67,66 @@ export class AuditInterceptor implements NestInterceptor {
       userRole: user?.role,
     });
 
-    return next.handle().pipe(
-      tap({
-        next: (result) => {
-          // Some attendance routes answer 200 with { status: 'error' }.
-          const failed = result?.status === 'error';
-          this.write({
-            ...base,
-            ...who(isLogin ? result?.user : actor),
-            target: describeTarget(request.body, result),
-            success: !failed,
-            error: failed ? String(result?.message ?? '') : undefined,
-          });
-        },
-        error: (err) => {
-          const entry = {
-            ...base,
-            target: describeTarget(request.body, null),
-            success: false,
-            statusCode: err instanceof HttpException ? err.getStatus() : 500,
-            error: err instanceof Error ? err.message : String(err),
-          };
-          if (isLogin) void this.writeFailedLogin(entry, request.body?.email);
-          else this.write({ ...entry, ...who(actor) });
-        },
-      }),
+    // A failed snapshot must never block the user's action.
+    const snapshot: Promise<Snapshot> = isLogin
+      ? Promise.resolve(undefined)
+      : this.changes.snapshot(action, request).catch(() => undefined);
+
+    return from(snapshot).pipe(
+      switchMap((before) =>
+        next.handle().pipe(
+          tap({
+            next: (result) => {
+              // Some attendance routes answer 200 with { status: 'error' }.
+              const failed = result?.status === 'error';
+              const entry = {
+                ...base,
+                ...who(isLogin ? result?.user : actor),
+                target: describeTarget(request.body, result),
+                success: !failed,
+                error: failed ? String(result?.message ?? '') : undefined,
+              };
+              if (failed || isLogin) return this.write(entry);
+              void this.changes
+                .describe(action, request, result, before)
+                .catch(() => undefined)
+                .then((summary) => {
+                  if (summary?.skip) return;
+                  this.write({
+                    ...entry,
+                    action: summary?.action ?? entry.action,
+                    target: summary?.target ?? entry.target,
+                    changes: summary?.changes,
+                  });
+                });
+            },
+            error: (err) => {
+              const entry = {
+                ...base,
+                target: describeTarget(request.body, null),
+                success: false,
+                statusCode:
+                  err instanceof HttpException ? err.getStatus() : 500,
+                error: err instanceof Error ? err.message : String(err),
+              };
+              if (isLogin) {
+                void this.writeFailedLogin(entry, request.body?.email);
+                return;
+              }
+              void this.changes
+                .targetOf(action, request, before)
+                .catch(() => undefined)
+                .then((target) =>
+                  this.write({
+                    ...entry,
+                    ...who(actor),
+                    target: target ?? entry.target,
+                  }),
+                );
+            },
+          }),
+        ),
+      ),
     );
   }
 

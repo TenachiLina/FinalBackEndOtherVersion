@@ -13,10 +13,12 @@ import { ZktecoService } from './zkteco.service';
 import { CompaniesService } from '../companies/companies.service';
 import { setCurrentCompany } from '../tenancy/tenant-context';
 import { Public } from '../auth/auth.decorators';
+import { SkipThrottle } from '@nestjs/throttler';
 
 // The ZKTeco device can't log in; it is authorized by its serial number instead,
 // which must be registered on exactly one company (Companies > devices).
 @Public()
+@SkipThrottle()
 @Controller('iclock')
 export class ZktecoController {
   private readonly logger = new Logger(ZktecoController.name);

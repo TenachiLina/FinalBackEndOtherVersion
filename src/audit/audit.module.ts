@@ -6,6 +6,7 @@ import { User, UserSchema } from '../auth/user.schema';
 import { AuditService } from './audit.service';
 import { AuditController } from './audit.controller';
 import { AuditInterceptor } from './audit.interceptor';
+import { AuditChanges } from './audit-changes';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { AuditInterceptor } from './audit.interceptor';
   controllers: [AuditController],
   providers: [
     AuditService,
+    AuditChanges,
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
   ],
 })
