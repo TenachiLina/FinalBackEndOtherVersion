@@ -5,6 +5,7 @@ import { Planning, PlanningDocument } from './planning.shema';
 import * as ExcelJS from "exceljs";
 import { Response } from "express";
 import { getBackupIds, getBackupEmployees } from './backups.util';
+import { currentCompanyId } from '../tenancy/tenant-context';
 
 @Injectable()
 export class PlanningService {
@@ -76,13 +77,42 @@ export class PlanningService {
   //     return this.planningModel.insertMany(docs) as any; 
   // }
 
-  async bulkSave(entries: any[], planDate: string): Promise<PlanningDocument[]>
-  {
+  // Saves of the same day, per company, waiting for each other (see bulkSave)
+  private readonly daySaves = new Map<string, Promise<unknown>>();
+
+  /**
+   * Replaces the planning of a day.
+   * Two saves of the same day at once (double click, two managers) would both
+   * delete and then both insert, storing every employee twice; so they run one
+   * after the other. The same employee twice in one cell is also kept only once.
+   */
+  async bulkSave(entries: any[], planDate: string): Promise<PlanningDocument[]> {
+    const key = `${currentCompanyId()}:${planDate}`;
+    const previous = this.daySaves.get(key) ?? Promise.resolve();
+    // .then keeps the request's tenant context, so the tenant plugin still scopes the queries
+    const run = previous.catch(() => undefined).then(() => this.replaceDay(entries, planDate));
+    this.daySaves.set(key, run);
+    const cleanup = () => {
+      if (this.daySaves.get(key) === run) this.daySaves.delete(key);
+    };
+    run.then(cleanup, cleanup);
+    return run;
+  }
+
+  private async replaceDay(entries: any[], planDate: string): Promise<PlanningDocument[]> {
     const start = new Date(planDate);
     start.setHours(0, 0, 0, 0);
     const end = new Date(planDate);
     end.setHours(23, 59, 59, 999);
     await this.planningModel.deleteMany({ planDate: { $gte: start, $lte: end } });
+
+    const seen = new Set<string>();
+    entries = entries.filter((e) => {
+      const cell = `${e.shiftId}|${e.taskId}|${e.empId}`;
+      if (seen.has(cell)) return false;
+      seen.add(cell);
+      return true;
+    });
     if (!entries.length) return [];
     const docs = entries.map((e) => ({
       shiftId: e.shiftId,
