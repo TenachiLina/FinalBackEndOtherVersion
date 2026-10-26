@@ -80,6 +80,8 @@ export function configureApp(app: NestExpressApplication) {
       'Accept',
       'Accept-Language',
       'X-Company-Id',
+      // Says whether a worktime save was a clock-in/out or an edit (activity log)
+      'X-Audit-As',
     ],
     credentials: true,
     // lets the frontend read export file names
