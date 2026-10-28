@@ -106,7 +106,7 @@ Move `security.e2e-spec.ts` onto the shared helpers. Then: `auth.controller`, `a
 Plus a **route matrix** test that lists all 84 routes with the roles allowed on each and checks
 401/403 and cross-company isolation for every one. This is where security bugs show up.
 
-### Phase 3: day-to-day data (target ≈ 80% / 76%)
+### Phase 3: day-to-day data (done: 75.9% / 75.7%)
 `employees`, `shifts`, `tasks`, `advances`, `bonuses`, `worktime` (`findAll` filters,
 `findForReport` date ranges, upserts, one record per employee and shift per day),
 `audit.interceptor` / `audit.service` / `audit.controller` (every write is audited, with the

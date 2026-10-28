@@ -52,6 +52,6 @@ module.exports = {
   coverageReporters: ['text-summary', 'text', 'html', 'json-summary'],
   // Raised after every phase (docs/TEST_PLAN.md) so coverage can't drop.
   coverageThreshold: {
-    global: { lines: 74, statements: 75, branches: 71, functions: 81 },
+    global: { lines: 75, statements: 77, branches: 75, functions: 82 },
   },
 };

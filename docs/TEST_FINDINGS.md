@@ -22,6 +22,7 @@ The plan is in [TEST_PLAN.md](TEST_PLAN.md).
 | 2026-10-28 | 0: tooling | 54.49% (1565/2872) | 40.33% | 40.5% | One config, unit + integration measured together (the security tests now count). 41 tests in 6 files. `main.ts` excluded. Thresholds set to 54/54/40/40. Lines are high because booting the app runs every module and schema file: branches are the honest number |
 | 2026-10-28 | 1: pure logic | 60.02% (1724/2872) | 55.6% | 53.22% | 228 tests in 18 files (+187). `common`, `tenancy`, `audit-actions`, `error-reporter`, `app-logger`, `device`, `client-info`, `security.config`, `backups.util` at 100% lines; `audit-changes` 99.5%. 4 bugs found. Thresholds 60/61/55/53 |
 | 2026-10-28 | 2: auth, users, companies, access | 74.37% (2136/2872) | 71.09% | 81.54% | 681 tests in 22 files (+453). Every route checked against every kind of caller (358 checks). `auth.guard` 98%, `users.service` 100%, `sessions.service` 92%, `companies.service` 98% lines. 4 bugs found. Thresholds 74/75/71/81 |
+| 2026-10-28 | 3: day-to-day data | 75.90% (2180/2872) | 75.73% | 82.97% | 760 tests in 26 files (+79). Employees, shifts, tasks, advances, bonuses, worktime, activity and error logs: every service 100% lines, controllers 100%, `audit.interceptor` 100%. 10 bugs found. Below the 80% line target because the rest is planning and attendance (Phases 4–5). Thresholds 75/77/75/82 |
 
 ## Bug files
 
@@ -38,18 +39,28 @@ Bugs are numbered by area. Each area file has the full entries plus an Observati
 
 ## All open bugs, by severity
 
-**8 open bugs: 0 High, 0 Medium, 8 Low.** Details (steps, expected, actual, suggested fix) are in the area files linked from each row.
+**18 open bugs: 0 High, 4 Medium, 14 Low.** Details (steps, expected, actual, suggested fix) are in the area files linked from each row.
 
 | ID | Severity | Area | Bug |
 |----|----------|------|-----|
+| [BUG-203](findings/staff.md#bug-203-a-manager-can-raise-their-own-salary) | Medium | Employees | A manager can raise their own salary |
+| [BUG-204](findings/staff.md#bug-204-a-shift-still-used-in-the-planning-is-deleted-at-once) | Medium | Shifts | A shift still used in the planning is deleted at once |
+| [BUG-401](findings/payroll.md#bug-401-an-advance-of-0-or-a-negative-amount-is-accepted) | Medium | Payroll | An advance of 0 or a negative amount is accepted |
+| [BUG-403](findings/payroll.md#bug-403-two-work-time-records-can-be-saved-for-the-same-employee-shift-and-day) | Medium | Payroll | Two work time records can be saved for the same employee, shift and day |
 | [BUG-001](#bug-001-a-mongodb-operator-nested-more-than-20-levels-deep-gets-past-the-injection-check) | Low | Common | A MongoDB operator nested more than 20 levels deep gets past the injection check |
 | [BUG-002](#bug-002-two-error-messages-reach-french-and-arabic-users-in-english) | Low | Common | Two error messages reach French and Arabic users in English |
 | [BUG-003](#bug-003-a-clock-out-at-exactly-0000-is-logged-as-clock-out-time-changed) | Low | Audit | A clock-out at exactly 00:00 is logged as "Clock-out time: Changed" |
+| [BUG-004](#bug-004-the-activity-and-error-logs-filter-days-in-utc-so-in-algeria-0000-0059-lands-on-the-day-before) | Low | Audit | The activity and error logs filter days in UTC, so in Algeria 00:00–00:59 lands on the day before |
+| [BUG-005](#bug-005-a-change-the-database-refuses-is-logged-as-a-500-with-mongooses-raw-text) | Low | Audit | A change the database refuses is logged as a 500, with Mongoose's raw text |
 | [BUG-101](findings/auth.md#bug-101-chrome-firefox-and-edge-on-phones-are-listed-as-another-browser) | Low | Auth | Chrome, Firefox and Edge on phones are listed as another browser |
 | [BUG-102](findings/auth.md#bug-102-two-admins-demoting-each-other-at-the-same-moment-leave-the-company-with-no-admin) | Low | Auth | Two admins demoting each other at the same moment leave the company with no admin |
 | [BUG-103](findings/auth.md#bug-103-a-second-company-whose-name-gives-the-same-sign-in-link-name-cant-be-created) | Low | Companies | A second company whose name gives the same sign-in link name can't be created |
 | [BUG-104](findings/auth.md#bug-104-a-weekly-advance-share-of-0-is-refused-with-a-message-saying-0-is-allowed) | Low | Companies | A weekly advance share of 0% is refused, with a message saying 0 is allowed |
+| [BUG-201](findings/staff.md#bug-201-an-edit-can-empty-an-employees-name) | Low | Employees | An edit can empty an employee's name |
+| [BUG-202](findings/staff.md#bug-202-an-unknown-id-answers-200-with-an-empty-body-instead-of-404) | Low | Employees, shifts, tasks | An unknown id answers 200 with an empty body instead of 404 |
+| [BUG-205](findings/staff.md#bug-205-the-api-accepts-an-employee-without-an-employee-number) | Low | Employees | The API accepts an employee without an employee number |
 | [BUG-301](findings/planning.md#bug-301-copying-a-month-without-the-months-crashes-with-a-500) | Low | Planning | Copying a month without the months crashes with a 500 |
+| [BUG-402](findings/payroll.md#bug-402-advances-and-bonuses-are-accepted-for-an-employee-who-doesnt-exist) | Low | Payroll | Advances and bonuses are accepted for an employee who doesn't exist |
 
 ## Open issues: common, tenancy, app setup, error logs, audit
 
@@ -85,7 +96,29 @@ Sorted by severity.
 - **Steps / input:** Night shift 16:00–00:00. The employee clocks out at exactly 00:00 (the page saves `clock_out: "00:00"` with `X-Audit-As: clock`).
 - **Expected:** Activity log: "Clocked out at 00:00".
 - **Actual:** "Clock-out time: Changed", with no time. `"00:00"` is how the backend used to store "not clocked yet", so the log hides it. The frontend now counts a 00:00 punch as a real time (frontend BUG-103) and sends `""` for "no time".
-- **Suggested fix:** Treat only `""`/`null` as "no time" in `isBlank` for clock fields and in `clockTime`. Check the worktime schema default (`clock_in`/`clock_out` default `"00:00"`) in Phase 3: the same ambiguity exists there.
+- **Suggested fix:** Treat only `""`/`null` as "no time" in `isBlank` for clock fields and in `clockTime`. Checked in Phase 3: the worktime schema still defaults `clock_in`/`clock_out` to `"00:00"`, and the frontend's clock-in page still sends "no time" as `"00:00"` (`ClockInPage.tsx`, `entryToPayload`). So a real midnight time can't be told from "not clocked" anywhere; fixing it means storing `""`/`null` for "no time" in the schema, the clock-in page and the reports together.
+- **Status:** Open
+
+### BUG-004: The activity and error logs filter days in UTC, so in Algeria 00:00–00:59 lands on the day before
+- **Severity:** Low
+- **Type:** Bug (time zone)
+- **Location:** `src/audit/audit.service.ts` `find` and `src/error-logs/error-log.service.ts` `find` (`new Date(`${query.from}T00:00:00.000Z`)`)
+- **Found by:** `logs.e2e-spec.ts` › "filters days in the company's time zone"
+- **Steps / input:** Something is changed at 00:30 on 20 October in Algeria (19 Oct 23:30 UTC). Open the activity log for 20 October.
+- **Expected:** The change is listed under 20 October.
+- **Actual:** It is listed under 19 October, and 21 October 00:00–00:59 shows up under the 20th. The filter uses UTC days; the company works in UTC+1 (`settings.utcOffset`).
+- **Suggested fix:** Build the range from the company's `utcOffset` (`2026-10-20T00:00:00+01:00`), as `audit-changes.ts` already does to show dates. The super admin's error log without a company can stay in UTC.
+- **Status:** Open
+
+### BUG-005: A change the database refuses is logged as a 500, with Mongoose's raw text
+- **Severity:** Low
+- **Type:** Bug
+- **Location:** `src/audit/audit.interceptor.ts`, error handler (`err instanceof HttpException ? err.getStatus() : 500`)
+- **Found by:** `logs.e2e-spec.ts` › "logs the refused employee … with the status the user saw (400)" / "(409)"
+- **Steps / input:** Add an employee without a name (400 for the user), or with an employee number already used (409).
+- **Expected:** The activity log shows the failed action with 400 / 409 and the message the user saw ("First name is required", "The employee number "6" is already used").
+- **Actual:** Status 500 and "Employee validation failed: lastName: Path `lastName` is required., …" or "E11000 duplicate key error …". The interceptor sees the database error before `AllExceptionsFilter` turns it into a 400/409, so admins reading the log think the server crashed.
+- **Suggested fix:** Share the translation: move `AllExceptionsFilter.translate` into a function both use, and log its status and message.
 - **Status:** Open
 
 ### Entry format
@@ -124,6 +157,14 @@ Sorted by severity.
   don't run there); it must never insert the SVG into the page as HTML.
 - The `/device/*` routes (status, users, logs of the clocking machine) all use one `DEVICE_IP` from the
   environment, whichever company asks. Checked in Phase 5.
+- A manager reading `GET /worktime` (used by the clock-in pages) gets every employee's penalty, bonus and
+  consumption, other managers included; only `GET /worktime/report` hides other managers. The clock-in pages
+  need everyone's times, but not their money fields.
+- Deleting an employee leaves their planning, work time, advances, bonuses and linked user account in place
+  (pointing at nothing). Reports and the planning have to cope with that.
+- Work time is searched by day from the server's own midnight (`new Date('2026-10-20T00:00:00.000')`)
+  while days are stored at UTC midnight. Right on a UTC server (Render) and in Algeria; it would miss
+  records on a server west of UTC.
 - `GET /` answers 404: `AppController` / `AppService` ("Hello World!") exist and have a unit test, but
   `AppModule` doesn't register them. If Render or an uptime check pings `/`, it gets a 404. Either
   register them (as a health check) or delete the two files and their test.
@@ -155,6 +196,8 @@ Sorted by severity.
   milliseconds or an ISO string and converts before faking.
 - The route list for the access tests is read from `AppModule`'s metadata when the file loads
   (`test/helpers/routes.ts`), because `it.each` needs it before the app starts.
+- Once in Phase 3, one coverage run printed per-file numbers from before the phase (e.g. bonuses 58%)
+  while its total matched the other runs; three later runs agreed exactly (75.76% lines). Not reproduced.
 - `test/security.e2e-spec.ts` still starts its own MongoDB instead of using `createTestApp()`. It
   passes and covers what it should; left as it is.
 
