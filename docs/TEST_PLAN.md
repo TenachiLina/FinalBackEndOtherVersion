@@ -112,7 +112,7 @@ Plus a **route matrix** test that lists all 84 routes with the roles allowed on 
 `audit.interceptor` / `audit.service` / `audit.controller` (every write is audited, with the
 right actor and changes), `error-logs.service` / `error-logs.controller`.
 
-### Phase 4: planning (target ≈ 86% / 81%)
+### Phase 4: planning (done: 91.6% / 81.7%)
 `planning.service.ts` is the biggest file (2,523 lines, 493 coverable) and has large near-duplicate
 blocks (week export with and without backups, Excel and PDF).
 - CRUD, `findAll` filters, `bulkSave` (replaces a day's planning, keeps other days), duplicate
@@ -123,7 +123,7 @@ blocks (week export with and without backups, Excel and PDF).
   backups, tasks). PDFs are checked for type, page count and text content.
 - Duplication is logged under **Observations** for a later refactor. Not refactored now (rule 2).
 
-### Phase 5: attendance, kiosk and devices (target ≈ 90% / 84%)
+### Phase 5: attendance, kiosk and devices (target ≈ 95% / 85%)
 `attendance.service` (`syncLogs` with the mocked device: new, duplicate, unknown-user and
 connection-failure punches; `getLogsByDateRange` around midnight in Algiers), `kiosk.controller`
 (kiosk accounts, feature off, face/PIN flows), `zkteco.controller` / `zkteco.service` (device push

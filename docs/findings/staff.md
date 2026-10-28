@@ -50,6 +50,7 @@ Sorted by severity.
 - **Expected:** 404 "… not found", as shifts already do for archive/restore/delete, and advances and bonuses.
 - **Actual:** 200 with an empty body. The frontend reports a save as successful when nothing was saved.
 - **Suggested fix:** Throw `NotFoundException` when the query returns `null`.
+- **Also:** `GET`/`PUT`/`DELETE /planning/:id` behave the same (`planning.e2e-spec.ts` › "… /planning/:id with an unknown id → 404").
 - **Status:** Open
 
 ### BUG-205: The API accepts an employee without an employee number

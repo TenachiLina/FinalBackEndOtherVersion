@@ -23,6 +23,7 @@ The plan is in [TEST_PLAN.md](TEST_PLAN.md).
 | 2026-10-28 | 1: pure logic | 60.02% (1724/2872) | 55.6% | 53.22% | 228 tests in 18 files (+187). `common`, `tenancy`, `audit-actions`, `error-reporter`, `app-logger`, `device`, `client-info`, `security.config`, `backups.util` at 100% lines; `audit-changes` 99.5%. 4 bugs found. Thresholds 60/61/55/53 |
 | 2026-10-28 | 2: auth, users, companies, access | 74.37% (2136/2872) | 71.09% | 81.54% | 681 tests in 22 files (+453). Every route checked against every kind of caller (358 checks). `auth.guard` 98%, `users.service` 100%, `sessions.service` 92%, `companies.service` 98% lines. 4 bugs found. Thresholds 74/75/71/81 |
 | 2026-10-28 | 3: day-to-day data | 75.90% (2180/2872) | 75.73% | 82.97% | 760 tests in 26 files (+79). Employees, shifts, tasks, advances, bonuses, worktime, activity and error logs: every service 100% lines, controllers 100%, `audit.interceptor` 100%. 10 bugs found. Below the 80% line target because the rest is planning and attendance (Phases 4–5). Thresholds 75/77/75/82 |
+| 2026-10-29 | 4: planning | **91.57% (2630/2872)** | 81.65% | 94.44% | 795 tests in 27 files (+35). `planning.service.ts` 11% → 99% lines: saving, import, copy-month, and the six exports read back cell by cell (Excel) or as text (PDF). 6 bugs found. Same result on 4 runs in a row. Thresholds 91/91/81/94 |
 
 ## Bug files
 
@@ -39,7 +40,7 @@ Bugs are numbered by area. Each area file has the full entries plus an Observati
 
 ## All open bugs, by severity
 
-**18 open bugs: 0 High, 4 Medium, 14 Low.** Details (steps, expected, actual, suggested fix) are in the area files linked from each row.
+**24 open bugs: 0 High, 7 Medium, 17 Low.** Details (steps, expected, actual, suggested fix) are in the area files linked from each row.
 
 | ID | Severity | Area | Bug |
 |----|----------|------|-----|
@@ -50,6 +51,9 @@ Bugs are numbered by area. Each area file has the full entries plus an Observati
 | [BUG-001](#bug-001-a-mongodb-operator-nested-more-than-20-levels-deep-gets-past-the-injection-check) | Low | Common | A MongoDB operator nested more than 20 levels deep gets past the injection check |
 | [BUG-002](#bug-002-two-error-messages-reach-french-and-arabic-users-in-english) | Low | Common | Two error messages reach French and Arabic users in English |
 | [BUG-003](#bug-003-a-clock-out-at-exactly-0000-is-logged-as-clock-out-time-changed) | Low | Audit | A clock-out at exactly 00:00 is logged as "Clock-out time: Changed" |
+| [BUG-306](findings/planning.md#bug-306-the-exports-leave-out-shifts-starting-at-1300-before-0600-and-in-the-evening) | Medium | Planning | The exports leave out shifts starting at 13:00, before 06:00 and in the evening |
+| [BUG-303](findings/planning.md#bug-303-importing-a-day-crashes-when-one-of-its-employees-or-shifts-was-deleted) | Medium | Planning | Importing a day crashes when one of its employees or shifts was deleted |
+| [BUG-304](findings/planning.md#bug-304-copying-a-month-deletes-the-whole-destination-month-also-the-weekdays-it-doesnt-copy) | Medium | Planning | Copying a month deletes the whole destination month, also the weekdays it doesn't copy |
 | [BUG-004](#bug-004-the-activity-and-error-logs-filter-days-in-utc-so-in-algeria-0000-0059-lands-on-the-day-before) | Low | Audit | The activity and error logs filter days in UTC, so in Algeria 00:00–00:59 lands on the day before |
 | [BUG-005](#bug-005-a-change-the-database-refuses-is-logged-as-a-500-with-mongooses-raw-text) | Low | Audit | A change the database refuses is logged as a 500, with Mongoose's raw text |
 | [BUG-101](findings/auth.md#bug-101-chrome-firefox-and-edge-on-phones-are-listed-as-another-browser) | Low | Auth | Chrome, Firefox and Edge on phones are listed as another browser |
@@ -60,6 +64,9 @@ Bugs are numbered by area. Each area file has the full entries plus an Observati
 | [BUG-202](findings/staff.md#bug-202-an-unknown-id-answers-200-with-an-empty-body-instead-of-404) | Low | Employees, shifts, tasks | An unknown id answers 200 with an empty body instead of 404 |
 | [BUG-205](findings/staff.md#bug-205-the-api-accepts-an-employee-without-an-employee-number) | Low | Employees | The API accepts an employee without an employee number |
 | [BUG-301](findings/planning.md#bug-301-copying-a-month-without-the-months-crashes-with-a-500) | Low | Planning | Copying a month without the months crashes with a 500 |
+| [BUG-302](findings/planning.md#bug-302-saving-a-day-without-the-list-of-entries-empties-the-day-then-crashes) | Low | Planning | Saving a day without the list of entries empties the day, then crashes |
+| [BUG-305](findings/planning.md#bug-305-the-first-tuesday-of-a-copied-month-is-the-tuesday-saved-first-not-the-earliest-one) | Low | Planning | "The first Tuesday" of a copied month is the Tuesday saved first, not the earliest one |
+| [BUG-307](findings/planning.md#bug-307-a-sub-task-without-a-start-time-makes-the-exports-crash) | Low | Planning | A sub-task without a start time makes the exports crash |
 | [BUG-402](findings/payroll.md#bug-402-advances-and-bonuses-are-accepted-for-an-employee-who-doesnt-exist) | Low | Payroll | Advances and bonuses are accepted for an employee who doesn't exist |
 
 ## Open issues: common, tenancy, app setup, error logs, audit
@@ -198,7 +205,12 @@ Sorted by severity.
   (`test/helpers/routes.ts`), because `it.each` needs it before the app starts.
 - Once in Phase 3, one coverage run printed per-file numbers from before the phase (e.g. bonuses 58%)
   while its total matched the other runs; three later runs agreed exactly (75.76% lines). Not reproduced.
-- `test/security.e2e-spec.ts` still starts its own MongoDB instead of using `createTestApp()`. It
-  passes and covers what it should; left as it is.
+- `test/security.e2e-spec.ts` started its own MongoDB, which on a busy machine sometimes didn't start
+  within 10 s (19 tests failing, about one coverage run in three). In Phase 4 it moved to the shared
+  test MongoDB (its own database in it); `maxWorkers: '50%'` keeps the integration files from starving
+  that MongoDB. 4 coverage runs in a row then passed with identical numbers.
+- `test/helpers/files.ts` reads downloads back: `download()` keeps the answer as bytes, `excelRows()`
+  opens an Excel file with exceljs, `pdfText()` pulls the text out of a pdfkit PDF (inflates its
+  streams and decodes the hex strings), `pdfPages()` counts pages.
 
 ## Refactors made to enable testing

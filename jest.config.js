@@ -28,6 +28,8 @@ const shared = {
 module.exports = {
   // Booting the app from a cold ts-jest cache takes more than the default 5 s
   testTimeout: 30_000,
+  // All integration files share one MongoDB; more workers than this starve it
+  maxWorkers: '50%',
   projects: [
     {
       ...shared,
@@ -52,6 +54,6 @@ module.exports = {
   coverageReporters: ['text-summary', 'text', 'html', 'json-summary'],
   // Raised after every phase (docs/TEST_PLAN.md) so coverage can't drop.
   coverageThreshold: {
-    global: { lines: 75, statements: 77, branches: 75, functions: 82 },
+    global: { lines: 91, statements: 91, branches: 81, functions: 94 },
   },
 };
