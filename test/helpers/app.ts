@@ -26,10 +26,8 @@ export async function createTestApp(): Promise<TestApp> {
   process.env.MONGODB_URI = `${base.replace(/\/?$/, '/')}${dbName}`;
 
   // Loaded here, after setup-env.ts, because modules read process.env when loaded
-  /* eslint-disable @typescript-eslint/no-require-imports */
   const { AppModule } = require('../../src/app.module');
   const { configureApp } = require('../../src/app.setup');
-  /* eslint-enable @typescript-eslint/no-require-imports */
 
   const moduleRef = await Test.createTestingModule({
     imports: [AppModule],

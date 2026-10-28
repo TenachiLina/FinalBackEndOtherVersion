@@ -9,7 +9,6 @@ export const PASSWORD = 'Str0ng-pass-1';
 // bcrypt with cost 12 takes ~250 ms: hash the shared password once per file
 let hash: Promise<string> | undefined;
 function passwordHash() {
-  /* eslint-disable-next-line @typescript-eslint/no-require-imports */
   const { UsersService } = require('../../src/auth/users.service');
   return (hash ??= UsersService.hashPassword(PASSWORD));
 }
@@ -30,8 +29,9 @@ export interface SeededUser {
  * as the tenant plugin requires.
  */
 export function seeder(t: TestApp) {
-  const inCompany = <T>(companyId: string, fn: () => Promise<T>) =>
-    runForCompany(companyId, fn);
+  // Mongoose queries run when awaited: await inside the company's context
+  const inCompany = <T>(companyId: string, fn: () => PromiseLike<T>) =>
+    runForCompany(companyId, async () => await fn());
 
   return {
     async company(

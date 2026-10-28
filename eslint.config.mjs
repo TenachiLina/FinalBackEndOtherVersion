@@ -32,9 +32,12 @@ export default tseslint.config(
     },
   },
   {
-    // Response bodies and lean documents are `any` in tests
+    // Response bodies and lean documents are `any` in tests; fakes are
+    // async without awaiting, and modules are re-required for a fresh state
     files: ['test/**/*.ts', 'src/**/*.spec.ts'],
     rules: {
+      '@typescript-eslint/require-await': 'off',
+      '@typescript-eslint/no-require-imports': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',
       '@typescript-eslint/no-unsafe-call': 'off',

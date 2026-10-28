@@ -8,7 +8,6 @@ import { getModelToken } from '@nestjs/mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import type { Model } from 'mongoose';
 import { createHmac } from 'crypto';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const request = require('supertest');
 
 const JWT_SECRET = 'test-secret-'.padEnd(64, 'x');
@@ -60,7 +59,6 @@ beforeAll(async () => {
     ACCESS_TOKEN_TTL: '15m',
   });
   // Loaded after the environment is set: modules read it when loaded.
-  /* eslint-disable @typescript-eslint/no-require-imports */
   const { AppModule } = require('../src/app.module');
   const { configureApp } = require('../src/app.setup');
   const moduleRef = await Test.createTestingModule({

@@ -92,7 +92,7 @@ are the merged numbers (lines / branches).
   server) and comment-only blocks, and document why.
 - `docs/TESTING.md`: how to run, helpers, rules.
 
-### Phase 1: pure logic (target ≈ 60% / 50%)
+### Phase 1: pure logic (done: 60.0% / 55.6%)
 `common/security.ts`, `common/sanitize.ts`, `common/all-exceptions.filter.ts`,
 `common/messages.i18n.ts`, `tenancy/tenant-context.ts`, `tenancy/tenant.plugin.ts` (with a memory
 DB: reads, writes, `runAsSystem`, missing context → `TenantContextError`), `auth/device.ts`,
