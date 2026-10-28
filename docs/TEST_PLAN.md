@@ -99,20 +99,20 @@ DB: reads, writes, `runAsSystem`, missing context → `TenantContextError`), `au
 `auth/client-info.ts`, `auth/security.config.ts`, `planning/backups.util.ts`, `audit/audit-actions.ts`,
 the rest of `audit-changes.ts` and `error-reporter.ts`, `error-logs/app-logger.ts`.
 
-### Phase 2: auth, users, companies and access control (target ≈ 66% / 58%)
+### Phase 2: auth, users, companies and access control (done: 74.4% / 71.1%)
 Move `security.e2e-spec.ts` onto the shared helpers. Then: `auth.controller`, `auth.guard`,
 `auth.decorators`, `sessions.*`, `users.*`, `companies.controller` and `companies.service`
 (branding, device serials, feature flags, slug lookups).
-Plus a **route matrix** test that lists all 91 routes with the roles allowed on each and checks
+Plus a **route matrix** test that lists all 84 routes with the roles allowed on each and checks
 401/403 and cross-company isolation for every one. This is where security bugs show up.
 
-### Phase 3: day-to-day data (target ≈ 72% / 64%)
+### Phase 3: day-to-day data (target ≈ 80% / 76%)
 `employees`, `shifts`, `tasks`, `advances`, `bonuses`, `worktime` (`findAll` filters,
 `findForReport` date ranges, upserts, one record per employee and shift per day),
 `audit.interceptor` / `audit.service` / `audit.controller` (every write is audited, with the
 right actor and changes), `error-logs.service` / `error-logs.controller`.
 
-### Phase 4: planning (target ≈ 84% / 74%)
+### Phase 4: planning (target ≈ 86% / 81%)
 `planning.service.ts` is the biggest file (2,523 lines, 493 coverable) and has large near-duplicate
 blocks (week export with and without backups, Excel and PDF).
 - CRUD, `findAll` filters, `bulkSave` (replaces a day's planning, keeps other days), duplicate
@@ -123,7 +123,7 @@ blocks (week export with and without backups, Excel and PDF).
   backups, tasks). PDFs are checked for type, page count and text content.
 - Duplication is logged under **Observations** for a later refactor. Not refactored now (rule 2).
 
-### Phase 5: attendance, kiosk and devices (target ≈ 90% / 80%)
+### Phase 5: attendance, kiosk and devices (target ≈ 90% / 84%)
 `attendance.service` (`syncLogs` with the mocked device: new, duplicate, unknown-user and
 connection-failure punches; `getLogsByDateRange` around midnight in Algiers), `kiosk.controller`
 (kiosk accounts, feature off, face/PIN flows), `zkteco.controller` / `zkteco.service` (device push

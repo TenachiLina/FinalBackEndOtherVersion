@@ -20,7 +20,9 @@ export async function withTimeZone<T>(
  * Fixes "now" without freezing setTimeout/setImmediate, which Nest,
  * Mongoose and supertest need. Undo with jest.useRealTimers().
  */
-export function setNow(iso: string) {
+export function setNow(when: string | number) {
+  // Read before faking: the fake Date is not accepted by setSystemTime
+  const ms = typeof when === 'number' ? when : Date.parse(when);
   jest.useFakeTimers({
     doNotFake: [
       'nextTick',
@@ -32,5 +34,5 @@ export function setNow(iso: string) {
       'queueMicrotask',
     ],
   });
-  jest.setSystemTime(new Date(iso));
+  jest.setSystemTime(ms);
 }

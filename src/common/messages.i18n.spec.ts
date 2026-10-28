@@ -50,8 +50,8 @@ describe('translateMessage', () => {
       "Le rôle doit être l'un de : admin, manager",
     );
     expect(
-      translateMessage('Password must be at least 10 characters', 'ar'),
-    ).toContain('10');
+      translateMessage('Password must be at least 8 characters', 'ar'),
+    ).toContain('8');
     expect(translateMessage('Ali is already clocked in', 'fr')).toBe(
       'Ali a déjà pointé son arrivée',
     );
@@ -75,7 +75,7 @@ describe('translateMessage', () => {
     'Amount has an invalid value',
     'Hours per day must be between 0 and 24',
     'Title must be at most 60 characters',
-    'Password must be at least 10 characters',
+    'Password must be at least 8 characters',
     'Role must be one of: admin',
     'Features must be from: planning',
     'The "advances" feature is not enabled for this company',
@@ -136,7 +136,7 @@ describe('error messages thrown by the API', () => {
   // Messages built with a variable part (template strings in the source)
   it.each([
     'Advance 64b7f0c2a1b2c3d4e5f60001 not found.',
-    'Password must be at least 10 characters',
+    'Password must be at least 8 characters',
     'Role must be one of: admin, manager, employee',
     'Features must be from: planning, clockin',
     'Title must be at most 60 characters',

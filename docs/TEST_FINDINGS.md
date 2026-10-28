@@ -21,6 +21,7 @@ The plan is in [TEST_PLAN.md](TEST_PLAN.md).
 | 2026-10-28 | Baseline (`dev` @ 72bbece) | 9.94% (288/2897) | 12.5% | 10.85% | 18 unit tests in 4 files. The 19 security tests aren't counted (46% lines on their own). `test:e2e` doesn't run |
 | 2026-10-28 | 0: tooling | 54.49% (1565/2872) | 40.33% | 40.5% | One config, unit + integration measured together (the security tests now count). 41 tests in 6 files. `main.ts` excluded. Thresholds set to 54/54/40/40. Lines are high because booting the app runs every module and schema file: branches are the honest number |
 | 2026-10-28 | 1: pure logic | 60.02% (1724/2872) | 55.6% | 53.22% | 228 tests in 18 files (+187). `common`, `tenancy`, `audit-actions`, `error-reporter`, `app-logger`, `device`, `client-info`, `security.config`, `backups.util` at 100% lines; `audit-changes` 99.5%. 4 bugs found. Thresholds 60/61/55/53 |
+| 2026-10-28 | 2: auth, users, companies, access | 74.37% (2136/2872) | 71.09% | 81.54% | 681 tests in 22 files (+453). Every route checked against every kind of caller (358 checks). `auth.guard` 98%, `users.service` 100%, `sessions.service` 92%, `companies.service` 98% lines. 4 bugs found. Thresholds 74/75/71/81 |
 
 ## Bug files
 
@@ -37,7 +38,7 @@ Bugs are numbered by area. Each area file has the full entries plus an Observati
 
 ## All open bugs, by severity
 
-**4 open bugs: 0 High, 0 Medium, 4 Low.** Details (steps, expected, actual, suggested fix) are in the area files linked from each row.
+**8 open bugs: 0 High, 0 Medium, 8 Low.** Details (steps, expected, actual, suggested fix) are in the area files linked from each row.
 
 | ID | Severity | Area | Bug |
 |----|----------|------|-----|
@@ -45,6 +46,10 @@ Bugs are numbered by area. Each area file has the full entries plus an Observati
 | [BUG-002](#bug-002-two-error-messages-reach-french-and-arabic-users-in-english) | Low | Common | Two error messages reach French and Arabic users in English |
 | [BUG-003](#bug-003-a-clock-out-at-exactly-0000-is-logged-as-clock-out-time-changed) | Low | Audit | A clock-out at exactly 00:00 is logged as "Clock-out time: Changed" |
 | [BUG-101](findings/auth.md#bug-101-chrome-firefox-and-edge-on-phones-are-listed-as-another-browser) | Low | Auth | Chrome, Firefox and Edge on phones are listed as another browser |
+| [BUG-102](findings/auth.md#bug-102-two-admins-demoting-each-other-at-the-same-moment-leave-the-company-with-no-admin) | Low | Auth | Two admins demoting each other at the same moment leave the company with no admin |
+| [BUG-103](findings/auth.md#bug-103-a-second-company-whose-name-gives-the-same-sign-in-link-name-cant-be-created) | Low | Companies | A second company whose name gives the same sign-in link name can't be created |
+| [BUG-104](findings/auth.md#bug-104-a-weekly-advance-share-of-0-is-refused-with-a-message-saying-0-is-allowed) | Low | Companies | A weekly advance share of 0% is refused, with a message saying 0 is allowed |
+| [BUG-301](findings/planning.md#bug-301-copying-a-month-without-the-months-crashes-with-a-500) | Low | Planning | Copying a month without the months crashes with a 500 |
 
 ## Open issues: common, tenancy, app setup, error logs, audit
 
@@ -107,6 +112,18 @@ Sorted by severity.
   make the helpers await what `fn` returns. (The test helpers do this.)
 - The tenant plugin is solid: 19 tests against a real MongoDB found no way to read, change, move or
   delete another company's records, and nothing runs without a company (it fails closed).
+- **Access control holds.** All 84 routes were called without a login, as a kiosk account, as a manager,
+  as an admin, by a company without the route's feature and by a super admin without a company: every
+  refusal was the expected 401/403, and no allowed caller was refused. Allowed callers sending an empty
+  body and ids that match nothing never crashed, except BUG-301. (The plan said 91 routes: 7 were in
+  commented-out code.)
+- Creating a user with an email used in *another* company answers "A user with this email already
+  exists", so an admin can find out whether an email has an account elsewhere. It follows from emails
+  being unique across companies (one sign-in page); worth knowing, not worth changing.
+- Company logos may be SVG. That is safe while the frontend shows them with `<img>` (scripts in an SVG
+  don't run there); it must never insert the SVG into the page as HTML.
+- The `/device/*` routes (status, users, logs of the clocking machine) all use one `DEVICE_IP` from the
+  environment, whichever company asks. Checked in Phase 5.
 - `GET /` answers 404: `AppController` / `AppService` ("Hello World!") exist and have a unit test, but
   `AppModule` doesn't register them. If Render or an uptime check pings `/`, it gets a 404. Either
   register them (as a health check) or delete the two files and their test.
@@ -132,5 +149,13 @@ Sorted by severity.
 - `test/security.e2e-spec.ts` still has Windows line endings in the working copy and fails Prettier;
   it moves onto the shared helpers in Phase 2.
 - `npm run lint` runs `eslint --fix`, which rewrites files. CI must run `eslint` without `--fix`.
+  **Never run it (or `eslint --fix`) on `src/` during this work**: it reformats ~90 application files.
+  It happened once in Phase 2; everything under `src/` was restored from git before committing.
+- `jest.setSystemTime` (Jest 30) refuses a `Date` made after `useFakeTimers()`; `setNow()` takes
+  milliseconds or an ISO string and converts before faking.
+- The route list for the access tests is read from `AppModule`'s metadata when the file loads
+  (`test/helpers/routes.ts`), because `it.each` needs it before the app starts.
+- `test/security.e2e-spec.ts` still starts its own MongoDB instead of using `createTestApp()`. It
+  passes and covers what it should; left as it is.
 
 ## Refactors made to enable testing
