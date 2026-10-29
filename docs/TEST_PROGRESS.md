@@ -1,7 +1,7 @@
 # Test coverage work: where we are and how to continue
 
 Handoff notes so the work can be picked up in a new session (person or Claude).
-Last updated: **2026-10-29, after Phase 6.** Read this first, then [TEST_PLAN.md](TEST_PLAN.md),
+Last updated: **2026-10-29, after Phase 7.** Read this first, then [TEST_PLAN.md](TEST_PLAN.md),
 [TESTING.md](TESTING.md) and [TEST_FINDINGS.md](TEST_FINDINGS.md).
 
 ## The task
@@ -27,39 +27,33 @@ findings files. At the end: Bug Report and Stability Assessment documents for th
   | fb9c137 | 3: day-to-day data | 75.9% | 75.7% | 83.0% | 760 | 10 |
   | b03222a | 4: planning | 91.6% | 81.7% | 94.4% | 795 | 6 |
   | 1216079 | 5: attendance, kiosk, devices | 99.1% | 92.2% | 99.3% | 889 | 5 |
-  | (Phase 6 commit) | 6: close the gaps | **99.8%** | **93.7%** | 99.5% | 923 | 0 |
+  | f2b065d | 6: close the gaps | **99.8%** | **93.7%** | 99.5% | 923 | 0 |
+  | (Phase 7 commit) | 7: CI (`.github/workflows/ci.yml`) | | | | 923 | |
 
-- **Both targets reached** (≥ 90% lines, ≥ 85% branches). Still to do: Phase 7 (CI), final reports.
+- **Both targets reached** (≥ 90% lines, ≥ 85% branches). Still to do: push and watch the first CI run, final reports.
 - **Coverage thresholds** in `jest.config.js`: lines 99, statements 99, branches 93, functions 99.
   Raise them at the end of every phase.
 - **29 open bugs: 1 High, 10 Medium, 18 Low**, all with an `it.failing` test. The list by severity is in
   `TEST_FINDINGS.md`; full entries in `TEST_FINDINGS.md` (BUG-0xx) and `docs/findings/*.md`.
 
-## Next: Phase 7, CI
+## Next: first CI run, then the final reports
 
-Phase 6 is done: 4 coverage runs in a row gave the same totals, and the weak files now have tests where the
-branch was real behaviour (`test/config.e2e-spec.ts` for the JWT secret checks and CORS; token, session,
-log-failure and export cases in the existing files). What is left uncovered, and why, is in the
-"Coverage exclusions" table of `TEST_FINDINGS.md`.
+Phase 7 is done: `.github/workflows/ci.yml` (Node 22, `npm ci`, lint of `test/**/*.ts` and
+`src/**/*.spec.ts`, build, `npm run test:cov`, coverage report as an artifact, MongoDB binary cached).
+The user chose to lint only the tests for now; `src/` has older lint errors. How it works is in
+`docs/TESTING.md` › CI.
 
-1. GitHub Actions on push/PR to `dev` and `main`: `npm ci`, `npx eslint "{src,test}/**/*.ts"`
-   (**not** `npm run lint`, which has `--fix`), `npm run build`, `npm run test:cov`.
-   The integration tests start their own MongoDB (`test/helpers/global-setup.ts`); check it downloads and
-   runs on the GitHub runner, and cache its binary.
-2. Lint of `src/` currently has errors that are not ours (pre-existing): **ask the user** whether CI lints
-   only `test/` for now.
-3. Commit `ci: …`. Don't push unless asked (the workflow only runs once pushed).
+1. **Not run yet**: it only runs once pushed to GitHub. Pushing `test/coverage` and opening a PR to `dev`
+   needs the user's go-ahead. On the first run, check the MongoDB download works on the runner and the
+   time (locally ~70 s for the tests).
+2. **Final deliverables:** update `TEST_FINDINGS.md`, then make Bug Report and Stability Assessment
+   documents (ask the user which format: the frontend ones are PDFs in `docs/`).
+3. Then the team fixes the bugs on `dev` (BUG-501, High, first), and we verify the fixes as for the
+   frontend: count the `it.failing` markers left on `dev`, run the suite, and check that test changes were
+   only `it.failing` → `it` (plus justified ones).
 
 Next free bug numbers: BUG-006 (common/audit), BUG-105 (auth/companies), BUG-206 (staff),
 BUG-308 (planning), BUG-404 (payroll), BUG-506 (attendance).
-
-## After that
-
-- **Final deliverables:** update `TEST_FINDINGS.md`, then make Bug Report and Stability Assessment documents
-  (ask the user which format: the frontend ones are PDFs in `docs/`). Then the team fixes the bugs on `dev`,
-  and we can verify the fixes as we did for the frontend: count the `it.failing` markers left on `dev`, run
-  the suite, and check that test changes were only `it.failing` → `it` (plus justified ones).
-  BUG-501 (High) should be fixed first.
 
 ## How to work (rules that matter)
 

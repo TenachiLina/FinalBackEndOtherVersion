@@ -138,7 +138,7 @@ Go file by file through the coverage report, worst first: error paths (invalid O
 validation failures, not-found), rare branches, i18n fallbacks. Raise the thresholds to the target.
 Run the full suite twice in a row to make sure it is stable.
 
-### Phase 7: CI
+### Phase 7: CI (done: `.github/workflows/ci.yml`, lint of the tests only for now)
 GitHub Actions on every push / PR to `dev` and `main`: install, lint (without `--fix`; the `lint`
 script fixes files, so CI needs `eslint .`), build, `npm run test:cov` with thresholds.
 

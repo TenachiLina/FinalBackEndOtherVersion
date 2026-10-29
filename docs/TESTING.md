@@ -22,6 +22,19 @@ every phase of [TEST_PLAN.md](TEST_PLAN.md).
 
 The first run downloads a MongoDB binary (`mongodb-memory-server`, ~70 MB, cached afterwards).
 
+## CI
+
+`.github/workflows/ci.yml` runs on every push and pull request to `dev` and `main`: `npm ci`, lint,
+`npm run build`, `npm run test:cov` (fails on a failing test or coverage below the thresholds). The
+coverage report is attached to each run as the `coverage` artifact.
+
+- Lint covers the tests only (`test/**/*.ts`, `src/**/*.spec.ts`): the application code in `src/` still
+  has older lint errors. Add `src/` to the lint step once they are cleaned up.
+- Never put `npm run lint` in CI or run it on `src/`: it runs `eslint --fix` and rewrites files.
+- On Windows, ESLint reports `Delete ␍` on files Git checked out with CRLF line endings. CI runs on
+  Linux and never sees them; run Prettier on the file if it bothers you locally.
+- A bug test (`it.failing`) that starts passing fails the run: change it to `it` in the fix commit.
+
 ## Helpers (`test/helpers/`)
 
 | File | What it gives you |
