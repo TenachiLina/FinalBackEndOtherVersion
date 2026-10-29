@@ -146,4 +146,5 @@ script fixes files, so CI needs `eslint .`), build, `npm run test:cov` with thre
 - Tests + helpers on branch `test/coverage` (from `dev`), one commit per phase.
 - `docs/TESTING.md`: how to write and run tests.
 - `docs/TEST_FINDINGS.md` + `docs/findings/*.md`: the bug list, by area and severity.
-- When done: Bug Report and Stability Assessment documents for the team, as for the frontend.
+- Done: `docs/Bug-Report.pdf` and `docs/Stability-Assessment.pdf` for the team, as for the frontend
+  (made by the scripts in `docs/reports/`).

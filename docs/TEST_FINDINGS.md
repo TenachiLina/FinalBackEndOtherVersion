@@ -12,7 +12,8 @@ Rules:
 - One fix per commit: `fix(BUG-0XX): <title>`.
 
 Run: `npm test`, `npm run test:cov` (report in `coverage/index.html`), `npm run test:security`.
-The plan is in [TEST_PLAN.md](TEST_PLAN.md).
+The plan is in [TEST_PLAN.md](TEST_PLAN.md). For the team: `Bug-Report.pdf` (every bug with its effect) and
+`Stability-Assessment.pdf` (scores), made from this log by `docs/reports/` (see the comment at the top of each script).
 
 ## Coverage progress
 
@@ -116,7 +117,7 @@ Sorted by severity.
 ### BUG-004: The activity and error logs filter days in UTC, so in Algeria 00:00–00:59 lands on the day before
 - **Severity:** Low
 - **Type:** Bug (time zone)
-- **Location:** `src/audit/audit.service.ts` `find` and `src/error-logs/error-log.service.ts` `find` (`new Date(`${query.from}T00:00:00.000Z`)`)
+- **Location:** `src/audit/audit.service.ts` `find` and `src/error-logs/error-log.service.ts` `find` (`` new Date(`${query.from}T00:00:00.000Z`) ``)
 - **Found by:** `logs.e2e-spec.ts` › "filters days in the company's time zone"
 - **Steps / input:** Something is changed at 00:30 on 20 October in Algeria (19 Oct 23:30 UTC). Open the activity log for 20 October.
 - **Expected:** The change is listed under 20 October.

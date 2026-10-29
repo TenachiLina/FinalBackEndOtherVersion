@@ -1,7 +1,7 @@
 # Test coverage work: where we are and how to continue
 
 Handoff notes so the work can be picked up in a new session (person or Claude).
-Last updated: **2026-10-29, after Phase 7.** Read this first, then [TEST_PLAN.md](TEST_PLAN.md),
+Last updated: **2026-10-29, after the final reports.** Read this first, then [TEST_PLAN.md](TEST_PLAN.md),
 [TESTING.md](TESTING.md) and [TEST_FINDINGS.md](TEST_FINDINGS.md).
 
 ## The task
@@ -28,29 +28,29 @@ findings files. At the end: Bug Report and Stability Assessment documents for th
   | b03222a | 4: planning | 91.6% | 81.7% | 94.4% | 795 | 6 |
   | 1216079 | 5: attendance, kiosk, devices | 99.1% | 92.2% | 99.3% | 889 | 5 |
   | f2b065d | 6: close the gaps | **99.8%** | **93.7%** | 99.5% | 923 | 0 |
-  | (Phase 7 commit) | 7: CI (`.github/workflows/ci.yml`) | | | | 923 | |
+  | e0c4f88 | 7: CI (`.github/workflows/ci.yml`) | | | | 923 | |
+  | (reports commit) | Bug Report + Stability Assessment PDFs | | | | | |
 
-- **Both targets reached** (≥ 90% lines, ≥ 85% branches). Still to do: push and watch the first CI run, final reports.
+- **Both targets reached** (≥ 90% lines, ≥ 85% branches). Still to do: push and watch the first CI run (waiting for the user), then verify the team's fixes.
 - **Coverage thresholds** in `jest.config.js`: lines 99, statements 99, branches 93, functions 99.
   Raise them at the end of every phase.
 - **29 open bugs: 1 High, 10 Medium, 18 Low**, all with an `it.failing` test. The list by severity is in
   `TEST_FINDINGS.md`; full entries in `TEST_FINDINGS.md` (BUG-0xx) and `docs/findings/*.md`.
 
-## Next: first CI run, then the final reports
+## Next: waiting on the user and the team
 
-Phase 7 is done: `.github/workflows/ci.yml` (Node 22, `npm ci`, lint of `test/**/*.ts` and
-`src/**/*.spec.ts`, build, `npm run test:cov`, coverage report as an artifact, MongoDB binary cached).
-The user chose to lint only the tests for now; `src/` has older lint errors. How it works is in
-`docs/TESTING.md` › CI.
+All planned work is done. The reports are `docs/Bug-Report.pdf` (29 bugs, each with its effect) and
+`docs/Stability-Assessment.pdf` (6.5/10 today, 8–8.5 after the 11 most important fixes, 9 after all).
+They are built by `docs/reports/`: `make_bug_report.py` reads the findings files and `effects.py` (one
+plain-language effect per bug; the script stops if one is missing); `make_stability.py` has its scores and
+text written by hand. Rebuild both after any change to the findings.
 
-1. **Not run yet**: it only runs once pushed to GitHub. Pushing `test/coverage` and opening a PR to `dev`
-   needs the user's go-ahead. On the first run, check the MongoDB download works on the runner and the
-   time (locally ~70 s for the tests).
-2. **Final deliverables:** update `TEST_FINDINGS.md`, then make Bug Report and Stability Assessment
-   documents (ask the user which format: the frontend ones are PDFs in `docs/`).
-3. Then the team fixes the bugs on `dev` (BUG-501, High, first), and we verify the fixes as for the
+1. **Not pushed**: the user said not to push yet. When they agree: push `test/coverage`, open a PR to `dev`,
+   and watch the first CI run (MongoDB download on the runner, time; locally ~70 s for the tests).
+2. Then the team fixes the bugs on `dev` (BUG-501, High, first), and we verify the fixes as for the
    frontend: count the `it.failing` markers left on `dev`, run the suite, and check that test changes were
-   only `it.failing` → `it` (plus justified ones).
+   only `it.failing` → `it` (plus justified ones). Move each fixed entry to "Fixed issues", update the
+   scores in `make_stability.py`, rebuild the PDFs.
 
 Next free bug numbers: BUG-006 (common/audit), BUG-105 (auth/companies), BUG-206 (staff),
 BUG-308 (planning), BUG-404 (payroll), BUG-506 (attendance).
@@ -98,6 +98,7 @@ BUG-308 (planning), BUG-404 (payroll), BUG-506 (attendance).
 | Test helpers | `test/helpers/`: `app.ts` (`createTestApp`, `api`), `seed.ts` (`seeder`, `loginAs`, `PASSWORD`, `unknownId`), `time.ts`, `files.ts` (Excel/PDF), `routes.ts` (route list for the access matrix), `fake-zklib.ts` |
 | Integration tests | `test/*.e2e-spec.ts`: access (all 84 routes × callers), config (JWT secret, CORS), auth, users, companies, staff, payroll, logs, planning, attendance, kiosk, zkteco, tenancy, security, app |
 | Unit tests | `src/**/*.spec.ts` |
+| Reports for the team | `docs/Bug-Report.pdf`, `docs/Stability-Assessment.pdf`; scripts in `docs/reports/` (Python + reportlab) |
 | Plan / how-to / bugs | `docs/TEST_PLAN.md`, `docs/TESTING.md`, `docs/TEST_FINDINGS.md`, `docs/findings/{auth,staff,planning,payroll,attendance}.md` |
 | Useful scratch scripts | `sum.js` (coverage per folder from `coverage/coverage-summary.json`, needs `--coverageReporters=json-summary`) in the Claude scratchpad; easy to rewrite |
 
