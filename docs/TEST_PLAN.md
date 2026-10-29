@@ -123,11 +123,15 @@ blocks (week export with and without backups, Excel and PDF).
   backups, tasks). PDFs are checked for type, page count and text content.
 - Duplication is logged under **Observations** for a later refactor. Not refactored now (rule 2).
 
-### Phase 5: attendance, kiosk and devices (target ≈ 95% / 85%)
+### Phase 5: attendance, kiosk and devices (done: 99.1% / 92.2%)
 `attendance.service` (`syncLogs` with the mocked device: new, duplicate, unknown-user and
 connection-failure punches; `getLogsByDateRange` around midnight in Algiers), `kiosk.controller`
 (kiosk accounts, feature off, face/PIN flows), `zkteco.controller` / `zkteco.service` (device push
 endpoints, serial → company lookup, bad payloads), `attendance-device.*`.
+Done in `test/zkteco.e2e-spec.ts`, `test/kiosk.e2e-spec.ts`, `test/attendance.e2e-spec.ts`. There is no
+face/PIN flow in the backend kiosk (it only takes an employee number); the ZKTeco machine does the face
+check itself. Both coverage targets were passed here, so Phase 6 is only the stability check and the
+few weak files.
 
 ### Phase 6: close the gaps (target ≥ 90% lines, ≥ 85% branches)
 Go file by file through the coverage report, worst first: error paths (invalid ObjectId, DB errors,

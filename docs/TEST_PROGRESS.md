@@ -1,7 +1,7 @@
 # Test coverage work: where we are and how to continue
 
 Handoff notes so the work can be picked up in a new session (person or Claude).
-Last updated: **2026-10-29, after Phase 4.** Read this first, then [TEST_PLAN.md](TEST_PLAN.md),
+Last updated: **2026-10-29, after Phase 5.** Read this first, then [TEST_PLAN.md](TEST_PLAN.md),
 [TESTING.md](TESTING.md) and [TEST_FINDINGS.md](TEST_FINDINGS.md).
 
 ## The task
@@ -25,54 +25,36 @@ findings files. At the end: Bug Report and Stability Assessment documents for th
   | fbeb27a | 1: pure logic | 60.0% | 55.6% | 53.2% | 228 | 4 |
   | 4e5f3aa | 2: auth, users, companies, access | 74.4% | 71.1% | 81.5% | 681 | 4 |
   | fb9c137 | 3: day-to-day data | 75.9% | 75.7% | 83.0% | 760 | 10 |
-  | b03222a | 4: planning | **91.6%** | **81.7%** | 94.4% | 795 | 6 |
+  | b03222a | 4: planning | 91.6% | 81.7% | 94.4% | 795 | 6 |
+  | (Phase 5 commit) | 5: attendance, kiosk, devices | **99.1%** | **92.2%** | 99.3% | 889 | 5 |
 
-- **Line target reached. Still to do:** branches 81.7% → 85%, Phase 5, Phase 6, Phase 7, final reports.
-- **Coverage thresholds** in `jest.config.js`: lines 91, statements 91, branches 81, functions 94.
+- **Both targets reached** (≥ 90% lines, ≥ 85% branches). Still to do: Phase 6 (stability + weak files),
+  Phase 7 (CI), final reports.
+- **Coverage thresholds** in `jest.config.js`: lines 99, statements 98, branches 92, functions 99.
   Raise them at the end of every phase.
-- **24 open bugs: 0 High, 7 Medium, 17 Low**, all with an `it.failing` test. The list by severity is in
+- **29 open bugs: 1 High, 10 Medium, 18 Low**, all with an `it.failing` test. The list by severity is in
   `TEST_FINDINGS.md`; full entries in `TEST_FINDINGS.md` (BUG-0xx) and `docs/findings/*.md`.
 
-## Next: Phase 5, attendance, kiosk and clocking machines
+## Next: Phase 6, stability and the few weak files
 
-What is left uncovered (from the last coverage run):
+Phase 5 is done (`test/zkteco.e2e-spec.ts`, `test/kiosk.e2e-spec.ts`, `test/attendance.e2e-spec.ts`) and
+found BUG-501…505, including the first **High** one: every company reads the one machine at `DEVICE_IP`
+(BUG-501). Next free number in `docs/findings/attendance.md`: BUG-506.
 
-| File | Lines | Branches | Size |
-|------|-------|----------|------|
-| `src/zkteco/zkteco.service.ts` | 14% | 0% | 167 lines |
-| `src/zkteco/zkteco.controller.ts` | 30% | 0% | 152 (public `/iclock/*` routes, the machine pushes punches, authorised by device serial) |
-| `src/attendance/kiosk.controller.ts` | 32% | 5% | 305 (kiosk accounts clock employees in/out) |
-| `src/attendance/attendance.service.ts` | 45% | 28% | 323 (`syncLogs`, `getDeviceLogs`, `getLogsByDateRange`, `deleteDeviceLog`) |
-| `src/attendance/attendance.controller.ts` | 81% | 17% | 124 |
-| `src/attendance-device/*` | 77–88% | 0–67% | 133 (`/device/*`, uses `node-zklib`) |
-| small rest | | | `app.setup.ts` 58,74 (CORS origins), `auth.module.ts` 43,51-53 (JWT secret checks), `sessions.service.ts` 257-267 |
+Both coverage targets are already met, so Phase 6 is short:
 
-Plan for it (new files `test/attendance.e2e-spec.ts`, `test/kiosk.e2e-spec.ts`, `test/zkteco.e2e-spec.ts`):
+1. Run `npm run test:cov` 3–4 times in a row: same totals, no flaky test (the kiosk tests fake the clock).
+2. Optional, worst branches left: `app.setup.ts` 58% (CORS origins, production-only lists),
+   `auth.module.ts` 60% (JWT secret checks), `auth/users.controller.ts` / `auth.controller.ts` /
+   `app.module.ts` 50% (decorator or env branches), `planning.service.ts` 80%, `shifts.service.ts` 75%,
+   `companies.controller.ts` 75%. Only worth it where a branch is real behaviour, not a TypeScript artefact.
+3. Raise thresholds if they moved, update `TEST_FINDINGS.md` / `TEST_PLAN.md`, commit `test: phase 6 …`.
 
-1. **Read the code first** (all of it, in full: a quick filtered read once produced two false bugs).
-2. `/iclock/*` (ZKTeco ADMS push protocol, plain HTTP allowed): device serial → company lookup
-   (`companies.service.findByDeviceSerial`), unknown serial, bad payloads, punches stored in the right company,
-   duplicates, `@SkipAudit`. Send raw `text/plain` bodies like the machine does (`express.text` in `app.setup.ts`).
-3. Kiosk: `GET /kiosk/employees`, `POST /kiosk/clock` (in / out, "already clocked in", "isn't clocked in yet",
-   feature `clockin` off, kiosk account vs admin/manager), what it writes to worktime and the activity log
-   (`kiosk.clockIn` / `kiosk.clockOut`), times in Algeria (UTC+1), around midnight and night shifts.
-4. Attendance: `POST /attendance/sync` with the fake device (`test/helpers/fake-zklib.ts`:
-   `fakeDevice.attendances`, `.users`, `.reachable = false`; call `fakeDevice.reset()` in `afterEach`),
-   `GET /attendance/device-logs` by day and range in Algeria time, add / edit / delete a punch.
-5. **Check the observation from Phase 2:** the `/device/*` routes all use one `DEVICE_IP` env var, whichever
-   company asks. If company A can read company B's machine (users, logs), that is a **security bug** (likely
-   High): write it as a failing test.
-6. Raise thresholds, update `TEST_FINDINGS.md` (coverage row, bugs, observations), `TEST_PLAN.md` (phase done),
-   commit `test: phase 5 …`.
-
-Bug numbers for Phase 5: **BUG-501…** in `docs/findings/attendance.md` (still empty).
-Next free numbers elsewhere: BUG-006 (common/audit), BUG-105 (auth/companies), BUG-206 (staff),
-BUG-308 (planning), BUG-404 (payroll).
+Next free bug numbers elsewhere: BUG-006 (common/audit), BUG-105 (auth/companies), BUG-206 (staff),
+BUG-308 (planning), BUG-404 (payroll), BUG-506 (attendance).
 
 ## After that
 
-- **Phase 6 (branches ≥ 85%):** go file by file through `npm run test:cov` worst branches first; error paths
-  (invalid ids, DB errors), rare branches. Run the whole suite with coverage 3–4 times to make sure it is stable.
 - **Phase 7 (CI):** GitHub Actions on push/PR to `dev` and `main`: `npm ci`, `npx eslint "{src,test}/**/*.ts"`
   (**not** `npm run lint`, which has `--fix`), `npm run build`, `npm run test:cov`.
   Lint of `src/` currently has errors that are not ours (pre-existing); decide with the user whether CI lints
@@ -81,6 +63,7 @@ BUG-308 (planning), BUG-404 (payroll).
   (ask the user which format: the frontend ones are PDFs in `docs/`). Then the team fixes the bugs on `dev`,
   and we can verify the fixes as we did for the frontend: count the `it.failing` markers left on `dev`, run
   the suite, and check that test changes were only `it.failing` → `it` (plus justified ones).
+  BUG-501 (High) should be fixed first.
 
 ## How to work (rules that matter)
 
@@ -102,6 +85,8 @@ BUG-308 (planning), BUG-404 (payroll).
   `test/logs.e2e-spec.ts`).
 - **supertest:** don't build several requests and await them later (ECONNREFUSED); send each when needed.
 - **Fake time:** `setNow(ms | iso)` from `test/helpers/time.ts`; `jest.useRealTimers()` in `afterEach`.
+  Access tokens live 15 minutes of *fake* time too: after moving the clock, log in again (the `at()` helper
+  in `test/kiosk.e2e-spec.ts`).
   Jest 30's `setSystemTime` refuses a Date created after faking (handled in `setNow`).
 - **Time zones:** `withTimeZone('Africa/Algiers', fn)`. Planning and worktime dates are stored at UTC midnight
   from `YYYY-MM-DD`.
@@ -119,7 +104,7 @@ BUG-308 (planning), BUG-404 (payroll).
 |------|-------|
 | Jest config (projects `unit` + `integration`, thresholds, fake zklib) | `jest.config.js` |
 | Test helpers | `test/helpers/`: `app.ts` (`createTestApp`, `api`), `seed.ts` (`seeder`, `loginAs`, `PASSWORD`, `unknownId`), `time.ts`, `files.ts` (Excel/PDF), `routes.ts` (route list for the access matrix), `fake-zklib.ts` |
-| Integration tests | `test/*.e2e-spec.ts`: access (all 84 routes × callers), auth, users, companies, staff, payroll, logs, planning, tenancy, security, app |
+| Integration tests | `test/*.e2e-spec.ts`: access (all 84 routes × callers), auth, users, companies, staff, payroll, logs, planning, attendance, kiosk, zkteco, tenancy, security, app |
 | Unit tests | `src/**/*.spec.ts` |
 | Plan / how-to / bugs | `docs/TEST_PLAN.md`, `docs/TESTING.md`, `docs/TEST_FINDINGS.md`, `docs/findings/{auth,staff,planning,payroll,attendance}.md` |
 | Useful scratch scripts | `sum.js` (coverage per folder from `coverage/coverage-summary.json`, needs `--coverageReporters=json-summary`) in the Claude scratchpad; easy to rewrite |

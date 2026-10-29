@@ -23,7 +23,8 @@ The plan is in [TEST_PLAN.md](TEST_PLAN.md).
 | 2026-10-28 | 1: pure logic | 60.02% (1724/2872) | 55.6% | 53.22% | 228 tests in 18 files (+187). `common`, `tenancy`, `audit-actions`, `error-reporter`, `app-logger`, `device`, `client-info`, `security.config`, `backups.util` at 100% lines; `audit-changes` 99.5%. 4 bugs found. Thresholds 60/61/55/53 |
 | 2026-10-28 | 2: auth, users, companies, access | 74.37% (2136/2872) | 71.09% | 81.54% | 681 tests in 22 files (+453). Every route checked against every kind of caller (358 checks). `auth.guard` 98%, `users.service` 100%, `sessions.service` 92%, `companies.service` 98% lines. 4 bugs found. Thresholds 74/75/71/81 |
 | 2026-10-28 | 3: day-to-day data | 75.90% (2180/2872) | 75.73% | 82.97% | 760 tests in 26 files (+79). Employees, shifts, tasks, advances, bonuses, worktime, activity and error logs: every service 100% lines, controllers 100%, `audit.interceptor` 100%. 10 bugs found. Below the 80% line target because the rest is planning and attendance (Phases 4–5). Thresholds 75/77/75/82 |
-| 2026-10-29 | 4: planning | **91.57% (2630/2872)** | 81.65% | 94.44% | 795 tests in 27 files (+35). `planning.service.ts` 11% → 99% lines: saving, import, copy-month, and the six exports read back cell by cell (Excel) or as text (PDF). 6 bugs found. Same result on 4 runs in a row. Thresholds 91/91/81/94 |
+| 2026-10-29 | 4: planning | 91.57% (2630/2872) | 81.65% | 94.44% | 795 tests in 27 files (+35). `planning.service.ts` 11% → 99% lines: saving, import, copy-month, and the six exports read back cell by cell (Excel) or as text (PDF). 6 bugs found. Same result on 4 runs in a row. Thresholds 91/91/81/94 |
+| 2026-10-29 | 5: attendance, kiosk, devices | **99.05%** | **92.16%** | 99.28% | 889 tests in 30 files (+94). ZKTeco push (`/iclock`), kiosk clock-in/out with day, night and past-midnight shifts, sync from the machine, Clock-in History, `/device/*`: every file 100% lines except `zkteco.service` (98%). Branch target (85%) passed as well. 5 bugs found, 1 High. Thresholds 99/98/92/99 |
 
 ## Bug files
 
@@ -40,14 +41,18 @@ Bugs are numbered by area. Each area file has the full entries plus an Observati
 
 ## All open bugs, by severity
 
-**24 open bugs: 0 High, 7 Medium, 17 Low.** Details (steps, expected, actual, suggested fix) are in the area files linked from each row.
+**29 open bugs: 1 High, 10 Medium, 18 Low.** Details (steps, expected, actual, suggested fix) are in the area files linked from each row.
 
 | ID | Severity | Area | Bug |
 |----|----------|------|-----|
+| [BUG-501](findings/attendance.md#bug-501-every-company-reads-the-same-clocking-machine-so-one-company-gets-anothers-punches) | **High** | Attendance | Every company reads the same clocking machine, so one company gets another's punches |
 | [BUG-203](findings/staff.md#bug-203-a-manager-can-raise-their-own-salary) | Medium | Employees | A manager can raise their own salary |
 | [BUG-204](findings/staff.md#bug-204-a-shift-still-used-in-the-planning-is-deleted-at-once) | Medium | Shifts | A shift still used in the planning is deleted at once |
 | [BUG-401](findings/payroll.md#bug-401-an-advance-of-0-or-a-negative-amount-is-accepted) | Medium | Payroll | An advance of 0 or a negative amount is accepted |
 | [BUG-403](findings/payroll.md#bug-403-two-work-time-records-can-be-saved-for-the-same-employee-shift-and-day) | Medium | Payroll | Two work time records can be saved for the same employee, shift and day |
+| [BUG-502](findings/attendance.md#bug-502-after-the-machines-log-is-cleared-its-new-punches-are-dropped-without-a-word) | Medium | Attendance | After the machine's log is cleared, its new punches are dropped without a word |
+| [BUG-504](findings/attendance.md#bug-504-after-a-normal-day-the-kiosk-thinks-the-employee-is-still-clocked-in-the-next-morning) | Medium | Kiosk | After a normal day, the kiosk thinks the employee is still clocked in the next morning |
+| [BUG-505](findings/attendance.md#bug-505-overtime-after-midnight-is-lost-unless-the-shift-ends-at-exactly-0000) | Medium | Kiosk | Overtime after midnight is lost unless the shift ends at exactly 00:00 |
 | [BUG-001](#bug-001-a-mongodb-operator-nested-more-than-20-levels-deep-gets-past-the-injection-check) | Low | Common | A MongoDB operator nested more than 20 levels deep gets past the injection check |
 | [BUG-002](#bug-002-two-error-messages-reach-french-and-arabic-users-in-english) | Low | Common | Two error messages reach French and Arabic users in English |
 | [BUG-003](#bug-003-a-clock-out-at-exactly-0000-is-logged-as-clock-out-time-changed) | Low | Audit | A clock-out at exactly 00:00 is logged as "Clock-out time: Changed" |
@@ -68,6 +73,7 @@ Bugs are numbered by area. Each area file has the full entries plus an Observati
 | [BUG-305](findings/planning.md#bug-305-the-first-tuesday-of-a-copied-month-is-the-tuesday-saved-first-not-the-earliest-one) | Low | Planning | "The first Tuesday" of a copied month is the Tuesday saved first, not the earliest one |
 | [BUG-307](findings/planning.md#bug-307-a-sub-task-without-a-start-time-makes-the-exports-crash) | Low | Planning | A sub-task without a start time makes the exports crash |
 | [BUG-402](findings/payroll.md#bug-402-advances-and-bonuses-are-accepted-for-an-employee-who-doesnt-exist) | Low | Payroll | Advances and bonuses are accepted for an employee who doesn't exist |
+| [BUG-503](findings/attendance.md#bug-503-clock-in-history-cuts-days-at-utc-midnight-so-in-algeria-0000-0059-lands-on-the-day-before) | Low | Attendance | Clock-in History cuts days at UTC midnight, so in Algeria 00:00–00:59 lands on the day before |
 
 ## Open issues: common, tenancy, app setup, error logs, audit
 
@@ -163,7 +169,7 @@ Sorted by severity.
 - Company logos may be SVG. That is safe while the frontend shows them with `<img>` (scripts in an SVG
   don't run there); it must never insert the SVG into the page as HTML.
 - The `/device/*` routes (status, users, logs of the clocking machine) all use one `DEVICE_IP` from the
-  environment, whichever company asks. Checked in Phase 5.
+  environment, whichever company asks. Checked in Phase 5: confirmed, it is [BUG-501](findings/attendance.md#bug-501-every-company-reads-the-same-clocking-machine-so-one-company-gets-anothers-punches).
 - A manager reading `GET /worktime` (used by the clock-in pages) gets every employee's penalty, bonus and
   consumption, other managers included; only `GET /worktime/report` hides other managers. The clock-in pages
   need everyone's times, but not their money fields.
