@@ -125,6 +125,14 @@ describe('PATCH /companies/:id', () => {
     expect((await user.get('/shifts')).status).toBe(403);
   });
 
+  it('refuses an empty name and keeps the old one', async () => {
+    const c = await seed.company({ name: 'Pizza' });
+    const res = await sa.patch(`/companies/${c.id}`).send({ name: '   ' });
+    expect(res.status).toBe(400);
+    expect(res.body.message).toBe('Company name is required');
+    expect((await sa.get(`/companies/${c.id}`)).body.name).toBe('Pizza');
+  });
+
   it('refuses unknown features', async () => {
     expect((await patch({ features: ['payroll'] })).status).toBe(400);
     expect((await patch({ features: 'planning' })).status).toBe(400);

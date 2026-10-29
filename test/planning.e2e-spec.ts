@@ -1,5 +1,6 @@
 import { createTestApp, type TestApp } from './helpers/app';
 import { loginAs, seeder, unknownId } from './helpers/seed';
+import { runForCompany } from '../src/tenancy/tenant-context';
 import { withTimeZone } from './helpers/time';
 import { download, excelRows, pdfPages, pdfText } from './helpers/files';
 
@@ -422,6 +423,35 @@ describe('exports', () => {
     'Thursday',
     'Friday',
   ];
+
+  it('leaves out entries whose employee or shift was deleted, in all six exports', async () => {
+    const s = await setup();
+    await s.plan(s.ali, s.morning, '2026-10-03');
+    await s.plan(s.sara, s.morning, '2026-10-03');
+    await s.plan(s.omar, s.evening, '2026-10-03');
+    await runForCompany(s.company.id, async () => {
+      await t.model('Employee').deleteOne({ _id: s.ali._id });
+      await t.model('Shift').deleteOne({ _id: s.evening._id });
+    });
+    for (const url of [
+      '/planning/export-first-week?year=2026&month=9',
+      '/planning/export-first-week-manager?year=2026&month=9',
+      '/planning/export-current-day?year=2026&month=10&day=3',
+    ]) {
+      expect((await download(s.admin.get(url))).status).toBe(200);
+      const pdf = await download(s.admin.get(`${url}&format=pdf`));
+      expect(pdf.status).toBe(200);
+      const text = pdfText(pdf.body).join('\n');
+      expect(text).toContain('Sara');
+      expect(text).not.toContain('Ali');
+    }
+  });
+
+  it('answers 400 for a day it cannot read', async () => {
+    const { admin } = await setup();
+    const res = await admin.get('/planning?planDate=someday');
+    expect(res.status).toBe(400);
+  });
 
   describe('first week, Excel', () => {
     it('lists who works at each hour of the first Saturday→Friday of the month', async () => {

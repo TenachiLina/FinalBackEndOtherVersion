@@ -152,6 +152,17 @@ describe('without a company', () => {
     );
   });
 
+  it('lets trusted code save a record with the company it is given', async () => {
+    const saved: any = await runAsSystem(() =>
+      new Item({ name: 'sys', companyId: B }).save(),
+    );
+    expect(String(saved.companyId)).toBe(B);
+    expect(names(await runForCompany(B, () => Item.find()))).toEqual([
+      'b1',
+      'sys',
+    ]);
+  });
+
   it('lets trusted code see everything', async () => {
     expect(names(await runAsSystem(() => Item.find()))).toEqual([
       'a1',

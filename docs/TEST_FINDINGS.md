@@ -24,7 +24,8 @@ The plan is in [TEST_PLAN.md](TEST_PLAN.md).
 | 2026-10-28 | 2: auth, users, companies, access | 74.37% (2136/2872) | 71.09% | 81.54% | 681 tests in 22 files (+453). Every route checked against every kind of caller (358 checks). `auth.guard` 98%, `users.service` 100%, `sessions.service` 92%, `companies.service` 98% lines. 4 bugs found. Thresholds 74/75/71/81 |
 | 2026-10-28 | 3: day-to-day data | 75.90% (2180/2872) | 75.73% | 82.97% | 760 tests in 26 files (+79). Employees, shifts, tasks, advances, bonuses, worktime, activity and error logs: every service 100% lines, controllers 100%, `audit.interceptor` 100%. 10 bugs found. Below the 80% line target because the rest is planning and attendance (Phases 4–5). Thresholds 75/77/75/82 |
 | 2026-10-29 | 4: planning | 91.57% (2630/2872) | 81.65% | 94.44% | 795 tests in 27 files (+35). `planning.service.ts` 11% → 99% lines: saving, import, copy-month, and the six exports read back cell by cell (Excel) or as text (PDF). 6 bugs found. Same result on 4 runs in a row. Thresholds 91/91/81/94 |
-| 2026-10-29 | 5: attendance, kiosk, devices | **99.05%** | **92.16%** | 99.28% | 889 tests in 30 files (+94). ZKTeco push (`/iclock`), kiosk clock-in/out with day, night and past-midnight shifts, sync from the machine, Clock-in History, `/device/*`: every file 100% lines except `zkteco.service` (98%). Branch target (85%) passed as well. 5 bugs found, 1 High. Thresholds 99/98/92/99 |
+| 2026-10-29 | 5: attendance, kiosk, devices | 99.05% | 92.16% | 99.28% | 889 tests in 30 files (+94). ZKTeco push (`/iclock`), kiosk clock-in/out with day, night and past-midnight shifts, sync from the machine, Clock-in History, `/device/*`: every file 100% lines except `zkteco.service` (98%). Branch target (85%) passed as well. 5 bugs found, 1 High. Thresholds 99/98/92/99 |
+| 2026-10-29 | 6: close the gaps | **99.79% (2866/2872)** | **93.73%** | 99.46% | 923 tests in 31 files (+34). JWT secret checks at start-up and CORS origins (new `config.e2e-spec.ts`), tokens signed with the right secret but no real session, an account that lost its company, session activity, log writes that fail, exports with deleted employees/shifts. Same totals on 4 runs in a row. No new bugs. Thresholds 99/99/93/99 |
 
 ## Bug files
 
@@ -182,6 +183,10 @@ Sorted by severity.
   `AppModule` doesn't register them. If Render or an uptime check pings `/`, it gets a 404. Either
   register them (as a health check) or delete the two files and their test.
 
+- `planning.controller.ts` `findAll` still has a debugging leftover: `console.error('💀💀💀 findAll error:', err)`
+  before re-throwing. It bypasses the app logger and the error log; the error is already logged by the
+  exception filter. Delete the try/catch.
+
 ## Fixed issues
 
 ## Coverage exclusions
@@ -189,6 +194,7 @@ Sorted by severity.
 | File / lines | Why |
 |--------------|-----|
 | `src/main.ts` | Starts a real server on a port and installs process-wide crash handlers. Everything it configures is in `app.setup.ts`, which the integration tests run |
+| Left uncovered (not excluded) after Phase 6 | `source-maps.ts` (one `require` used only by `main.ts`), `sessions.service.ts` "Session already renewed" (needs two refreshes landing in the same millisecond), `companies.service.ts` re-throw of a non-duplicate database error, `users.service.ts` guards the guard never reaches. The remaining branches are mostly default arguments and `??` fallbacks TypeScript adds, and `audit-changes.ts` labels for fields no route sends |
 
 ## Tooling notes
 

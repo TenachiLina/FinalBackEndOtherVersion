@@ -508,3 +508,36 @@ describe('the error log', () => {
     });
   });
 });
+
+describe("when a log entry can't be written", () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it.each([[new Error('disk full')], ['not an Error']])(
+    "the user's change still goes through (%s)",
+    async (failure) => {
+      const { admin } = await setup();
+      jest.spyOn(t.model('AuditLog'), 'create').mockRejectedValue(failure);
+      const res = await admin.post('/employees').send({
+        empNumber: 501,
+        firstName: 'Ali',
+        lastName: 'Ben',
+        baseSalary: 1,
+      });
+      expect(res.status).toBe(201);
+      await new Promise((r) => setTimeout(r, 100));
+    },
+  );
+
+  it.each([[new Error('disk full')], ['not an Error']])(
+    'a crash report from the browser is still answered (%s)',
+    async (failure) => {
+      const { admin } = await setup();
+      jest.spyOn(t.model('ErrorLog'), 'create').mockRejectedValue(failure);
+      const res = await admin
+        .post('/error-logs/client')
+        .send({ name: 'Error', message: 'boom', pageUrl: 'https://app/x' });
+      expect(res.status).toBe(204);
+      await new Promise((r) => setTimeout(r, 100));
+    },
+  );
+});

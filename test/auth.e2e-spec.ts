@@ -504,3 +504,105 @@ describe('login sessions, for the super admin', () => {
     );
   });
 });
+
+describe('tokens signed with the right secret but not by a login', () => {
+  // Someone who got hold of the secret (or a bug that signs other tokens)
+  // must still not get in without a real session.
+  const resign = async (token: string, change: Record<string, unknown>) => {
+    const { JwtService } = require('@nestjs/jwt');
+    const claims = JSON.parse(
+      Buffer.from(token.split('.')[1], 'base64url').toString(),
+    );
+    const { iat, exp, iss, aud, ...rest } = claims;
+    void [iat, exp, iss, aud];
+    const payload = Object.fromEntries(
+      Object.entries({ ...rest, ...change }).filter(([, v]) => v !== undefined),
+    );
+    return t.app.get(JwtService).signAsync(payload) as Promise<string>;
+  };
+  const me = (token: string) => api(t.app, { token }).get('/auth/me');
+
+  it.each([
+    ['without a session id', { sid: undefined }],
+    ['without a token id', { jti: undefined }],
+    ['with a session id that is not an id', { sid: 'abc' }],
+  ])('refuses a token %s', async (_, change) => {
+    const user = await loginAs(t, await seed.user('admin', company.id));
+    const res = await me(await resign(user.token, change));
+    expect(res.status).toBe(401);
+    expect(res.body.code).toBe('TOKEN_INVALID');
+  });
+
+  it("refuses a token pointing at someone else's session", async () => {
+    const mine = await loginAs(t, await seed.user('admin', company.id));
+    const other = await seed.user('admin', company.id);
+    const res = await me(await resign(mine.token, { sub: other.id }));
+    expect(res.status).toBe(401);
+  });
+
+  it('refuses a token for an unknown session', async () => {
+    const user = await loginAs(t, await seed.user('admin', company.id));
+    expect(
+      (await me(await resign(user.token, { sid: unknownId() }))).status,
+    ).toBe(401);
+  });
+});
+
+describe('accounts and sessions over time', () => {
+  it('refuses a company user whose account lost its company', async () => {
+    const user = await seed.user('manager', company.id);
+    const api = await loginAs(t, user);
+    await t.model('User').updateOne({ _id: user.id }, { companyId: null });
+    const res = await api.get('/auth/me');
+    expect(res.status).toBe(403);
+    expect(res.body.message).toBe('Your account has no company');
+  });
+
+  it('records activity on the session at most once a minute', async () => {
+    const user = await seed.user('admin', company.id);
+    setNow('2026-10-20T08:00:00Z');
+    const api = await loginAs(t, user);
+    const sid = JSON.parse(
+      Buffer.from(api.token.split('.')[1], 'base64url').toString(),
+    ).sid;
+    const lastSeen = async () =>
+      (await t.model('LoginSession').findById(sid).lean<any>()).lastSeenAt;
+    const first = await lastSeen();
+
+    setNow('2026-10-20T08:00:30Z');
+    await api.get('/auth/me');
+    expect(await lastSeen()).toEqual(first);
+
+    setNow('2026-10-20T08:02:00Z');
+    await api.get('/auth/me');
+    // The write isn't awaited by the request
+    const until = Date.now() + 2000;
+    let seen = await lastSeen();
+    while (seen?.getTime() === first?.getTime() && Date.now() < until) {
+      await new Promise((r) => setTimeout(r, 25));
+      seen = await lastSeen();
+    }
+    expect(seen.toISOString()).toBe('2026-10-20T08:02:00.000Z');
+  });
+
+  it('forgets expired lockouts of unknown emails once 10 000 are tracked', async () => {
+    const { AuthService } = require('../src/auth/auth.service');
+    const failures: Map<string, { count: number; lockedUntil: number }> =
+      t.app.get(AuthService).unknownFailures;
+    const kept = failures.size;
+    for (let i = 0; i < 10_001; i++) {
+      failures.set(`old-${i}`, { count: 0, lockedUntil: Date.now() - 1000 });
+    }
+    failures.set('still-locked', {
+      count: 0,
+      lockedUntil: Date.now() + 60_000,
+    });
+
+    await login('nobody-here@test.dz', 'Wrong-pass-1');
+
+    expect(failures.has('old-0')).toBe(false);
+    expect(failures.has('still-locked')).toBe(true);
+    expect(failures.size).toBeLessThan(kept + 10);
+    failures.delete('still-locked');
+  });
+});
