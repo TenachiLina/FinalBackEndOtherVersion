@@ -75,3 +75,9 @@ export const WorktimeSchema =
 
 // Each record belongs to one company; see tenancy/tenant.plugin.ts
 WorktimeSchema.plugin(tenantPlugin);
+// One record per employee, shift and day, or payroll pays the day twice.
+// Existing duplicates must go first: see scripts/dedupe-worktime.js
+WorktimeSchema.index(
+  { companyId: 1, emp_id: 1, shift_id: 1, work_date: 1 },
+  { unique: true, partialFilterExpression: { work_date: { $type: 'date' } } },
+);
