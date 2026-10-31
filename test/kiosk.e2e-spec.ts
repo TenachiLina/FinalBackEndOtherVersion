@@ -353,6 +353,42 @@ describe('POST /kiosk/clock', () => {
     });
   });
 
+  it('saves a clock-out at exactly midnight', async () => {
+    const { clock, worktime } = await setup();
+    await clock('2026-10-20T16:00:00', 'in');
+    await clock('2026-10-21T00:00:00', 'out');
+    expect((await worktime())[0]).toMatchObject({
+      clock_out: '00:00',
+      work_hours: '08:00',
+    });
+  });
+
+  it('keeps a midnight clock-out when the employee clocks in again that day', async () => {
+    const { company, empNumber, clock, worktime } = await setup();
+    await seed.worktime(company.id, {
+      emp_id: empNumber,
+      work_date: new Date('2026-10-20'),
+      clock_in: '07:50',
+      clock_out: '00:00',
+    });
+    await clock('2026-10-20T08:10:00', 'in');
+    expect((await worktime())[0]).toMatchObject({
+      clock_in: '07:50',
+      clock_out: '00:00',
+    });
+  });
+
+  it('keeps a clock-in at exactly midnight', async () => {
+    const { clock, worktime } = await setup();
+    await clock('2026-10-20T00:00:00', 'in');
+    await clock('2026-10-20T08:00:00', 'out');
+    expect((await worktime())[0]).toMatchObject({
+      clock_in: '00:00',
+      clock_out: '08:00',
+      work_hours: '08:00',
+    });
+  });
+
   it('keeps a clock-in already entered by a manager', async () => {
     const { company, empNumber, clock, worktime } = await setup();
     await seed.worktime(company.id, {

@@ -303,8 +303,6 @@ describe('work time', () => {
     expect(created.body).toMatchObject({
       emp_id: 7,
       work_date: '2026-10-20T00:00:00.000Z',
-      clock_in: '00:00',
-      clock_out: '00:00',
       work_hours: '00:00',
       penalty: 0,
       bonus: 0,
@@ -314,6 +312,45 @@ describe('work time', () => {
     expect((await admin.get(`/worktime/${created.body._id}`)).body.emp_id).toBe(
       7,
     );
+  });
+
+  it('has no clock times until they are saved', async () => {
+    const { admin } = await setup();
+    const { body } = await admin
+      .post('/worktime')
+      .send({ emp_id: 7, work_date: '2026-10-20' });
+    expect(body.clock_in ?? null).toBeNull();
+    expect(body.clock_out ?? null).toBeNull();
+  });
+
+  it('keeps a real midnight, and treats "" as no time', async () => {
+    const { admin } = await setup();
+    const created = await admin
+      .post('/worktime')
+      .send(day({ clock_in: '', clock_out: '00:00' }));
+    expect(created.body.clock_in ?? null).toBeNull();
+    expect(created.body.clock_out).toBe('00:00');
+
+    const edited = await admin
+      .put(`/worktime/${created.body._id}`)
+      .send({ clock_out: '' });
+    expect(edited.body.clock_out ?? null).toBeNull();
+  });
+
+  it('clears the times of a day with null', async () => {
+    const { admin } = await setup();
+    const { body } = await admin.post('/worktime').send(day());
+    const res = await admin
+      .put(`/worktime/${body._id}`)
+      .send({ clock_in: null, clock_out: null });
+    expect(res.body.clock_in ?? null).toBeNull();
+    expect(res.body.clock_out ?? null).toBeNull();
+
+    const again = await admin
+      .post('/worktime')
+      .send({ ...day(), clock_in: null, clock_out: null });
+    expect(again.body._id).toBe(body._id);
+    expect(again.body.clock_in ?? null).toBeNull();
   });
 
   it('finds the records of one employee, shift or day', async () => {
@@ -388,14 +425,12 @@ describe('work time', () => {
   it('updates the day on a second save, and keeps what it doesn’t send', async () => {
     const { admin } = await setup();
     const first = await admin.post('/worktime').send(day({ penalty: 200 }));
-    const second = await admin
-      .post('/worktime')
-      .send({
-        emp_id: 7,
-        shift_id: 's1',
-        work_date: '2026-10-20',
-        clock_out: '17:00',
-      });
+    const second = await admin.post('/worktime').send({
+      emp_id: 7,
+      shift_id: 's1',
+      work_date: '2026-10-20',
+      clock_out: '17:00',
+    });
     expect(second.status).toBe(201);
     expect(second.body).toMatchObject({
       _id: first.body._id,
