@@ -190,18 +190,15 @@ export class KioskController {
       work_date: workDate,
     });
 
-    const hasIn = existing?.clock_in && existing.clock_in !== '00:00';
-    const clockIn = hasIn
-      ? existing.clock_in!
+    const clockIn = existing?.clock_in
+      ? existing.clock_in
       : action === 'in'
         ? nowLocal.time
         : (sinceLocal?.time ?? nowLocal.time);
     const clockOut =
       action === 'out'
         ? nowLocal.time
-        : existing?.clock_out && existing.clock_out !== '00:00'
-          ? existing.clock_out
-          : null;
+        : existing?.clock_out || null;
 
     const shift = await this.plannedShift(
       empNumber,

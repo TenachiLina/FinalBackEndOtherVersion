@@ -21,13 +21,13 @@ export class Worktime {
   @Prop()
   work_date?: Date;
 
-  // First clock-in of the day
-  @Prop({ default: '00:00' })
-  clock_in?: string;
+  // First clock-in of the day. Empty means not clocked: "00:00" is a real midnight
+  @Prop({ type: String })
+  clock_in?: string | null;
 
-  // Final clock-out of the day
-  @Prop({ default: '00:00' })
-  clock_out?: string;
+  // Final clock-out of the day. Empty means not clocked: "00:00" is a real midnight
+  @Prop({ type: String })
+  clock_out?: string | null;
 
   // Total delay relative to the shift
   @Prop({ default: '0' })
