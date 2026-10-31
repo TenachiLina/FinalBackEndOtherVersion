@@ -293,20 +293,44 @@ describe('POST /kiosk/clock', () => {
   });
 
   // BUG-505: overtime past midnight is only counted for shifts ending at exactly 00:00
-  it.failing(
-    'counts overtime past midnight after an evening shift ending at 22:00',
-    async () => {
-      const { clock, plan, worktime } = await setup();
-      await plan('2026-10-20', '14:00', '22:00');
-      await clock('2026-10-20T14:00:00', 'in');
-      await clock('2026-10-21T01:00:00', 'out');
-      expect((await worktime())[0]).toMatchObject({
-        work_date: '2026-10-20',
-        work_hours: '11:00',
-        overtime_minutes: '180',
-      });
-    },
-  );
+  it('counts overtime past midnight after an evening shift ending at 22:00', async () => {
+    const { clock, plan, worktime } = await setup();
+    await plan('2026-10-20', '14:00', '22:00');
+    await clock('2026-10-20T14:00:00', 'in');
+    await clock('2026-10-21T01:00:00', 'out');
+    expect((await worktime())[0]).toMatchObject({
+      work_date: '2026-10-20',
+      work_hours: '11:00',
+      overtime_minutes: '180',
+    });
+  });
+
+  it('counts overtime for someone arriving after midnight on a night shift', async () => {
+    const { company, ali, clock, worktime } = await setup();
+    const shift = await seed.shift(company.id, {
+      startTime: '22:00',
+      endTime: '06:00',
+    });
+    await seed.planning(company.id, {
+      empId: String(ali._id),
+      shiftId: String(shift._id),
+      planDate: '2026-10-21',
+    });
+    await clock('2026-10-21T00:30:00', 'in');
+    await clock('2026-10-21T06:10:00', 'out');
+    expect((await worktime())[0]).toMatchObject({
+      overtime_minutes: '10',
+      work_hours: '05:40',
+    });
+  });
+
+  it('counts no overtime when leaving before a night shift ends', async () => {
+    const { clock, plan, worktime } = await setup();
+    await plan('2026-10-20', '22:00', '06:00');
+    await clock('2026-10-20T22:00:00', 'in');
+    await clock('2026-10-21T05:00:00', 'out');
+    expect((await worktime())[0].overtime_minutes).toBe('0');
+  });
 
   it('keeps the first clock-in and the last clock-out of the day', async () => {
     const { clock, worktime } = await setup();
@@ -370,29 +394,52 @@ describe('POST /kiosk/clock', () => {
 
   // BUG-504: after a normal day (in 08:00, out 17:00), the 08:00 punch leaves
   // the 16-hour window before the 17:00 one, so the kiosk sees one punch: "clocked in"
-  it.failing(
-    'lets someone who worked 08:00–17:00 yesterday clock in at 08:00 today',
-    async () => {
-      const { clock } = await setup();
-      await clock('2026-10-20T08:00:00', 'in');
-      await clock('2026-10-20T17:00:00', 'out');
-      const res = await clock('2026-10-21T08:00:00', 'in');
-      expect(res.status).toBe(201);
-    },
-  );
+  it('lets someone who worked 08:00–17:00 yesterday clock in at 08:00 today', async () => {
+    const { clock } = await setup();
+    await clock('2026-10-20T08:00:00', 'in');
+    await clock('2026-10-20T17:00:00', 'out');
+    const res = await clock('2026-10-21T08:00:00', 'in');
+    expect(res.status).toBe(201);
+  });
 
   // BUG-504 (same cause): the kiosk list shows them as clocked in all night
-  it.failing(
-    'shows someone who clocked out at 17:00 as not clocked in after midnight',
-    async () => {
-      const { clock, at } = await setup();
-      await clock('2026-10-20T08:00:00', 'in');
-      await clock('2026-10-20T17:00:00', 'out');
-      const kiosk = await at('2026-10-21T00:30:00');
-      const [ali] = (await kiosk.get('/kiosk/employees')).body;
-      expect(ali.clockedIn).toBe(false);
-    },
-  );
+  it('shows someone who clocked out at 17:00 as not clocked in after midnight', async () => {
+    const { clock, at } = await setup();
+    await clock('2026-10-20T08:00:00', 'in');
+    await clock('2026-10-20T17:00:00', 'out');
+    const kiosk = await at('2026-10-21T00:30:00');
+    const [ali] = (await kiosk.get('/kiosk/employees')).body;
+    expect(ali.clockedIn).toBe(false);
+  });
+
+  it('stays right through a week of normal days', async () => {
+    const { clock } = await setup();
+    for (const day of ['19', '20', '21', '22', '23']) {
+      expect((await clock(`2026-10-${day}T08:00:00`, 'in')).status).toBe(201);
+      expect((await clock(`2026-10-${day}T17:00:00`, 'out')).status).toBe(201);
+    }
+    expect((await clock('2026-10-24T08:00:00', 'in')).status).toBe(201);
+    expect((await clock('2026-10-24T08:05:00', 'in')).status).toBe(409);
+  });
+
+  it('starts a new session the day after a forgotten clock-out, then clocks out', async () => {
+    const { clock } = await setup();
+    await clock('2026-10-20T08:00:00', 'in');
+    expect((await clock('2026-10-21T08:30:00', 'in')).status).toBe(201);
+    expect((await clock('2026-10-21T17:00:00', 'out')).status).toBe(201);
+    expect((await clock('2026-10-22T08:00:00', 'in')).status).toBe(201);
+  });
+
+  it('still lists someone on a night shift as clocked in the next morning', async () => {
+    const { clock, at } = await setup();
+    await clock('2026-10-20T22:00:00', 'in');
+    const kiosk = await at('2026-10-21T05:00:00');
+    const [ali] = (await kiosk.get('/kiosk/employees')).body;
+    expect(ali).toMatchObject({
+      clockedIn: true,
+      since: '2026-10-20T21:00:00.000Z',
+    });
+  });
 
   it.each([
     ['+02:00', '09:05'],
