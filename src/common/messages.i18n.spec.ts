@@ -147,7 +147,7 @@ describe('error messages thrown by the API', () => {
   });
 
   // BUG-002: two messages with a variable part reach French and Arabic users in English
-  it.failing.each([
+  it.each([
     'An advance for employee 12 on 2026-10-20 already exists.',
     'Worktime with id 64b7f0c2a1b2c3d4e5f60001 not found',
   ])('translates "%s"', (m) => {
