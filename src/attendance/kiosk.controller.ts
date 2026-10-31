@@ -22,10 +22,13 @@ import { PlanningService } from '../planning/planning.service';
 import { CompaniesService } from '../companies/companies.service';
 import { currentCompanyId } from '../tenancy/tenant-context';
 
-// Punches older than this don't count towards "currently clocked in", so a
+// A clock-in older than this no longer counts as "currently clocked in", so a
 // forgotten clock-out doesn't block tomorrow's clock-in. Covers long and
 // overnight shifts.
 const SESSION_WINDOW_MS = 16 * 60 * 60 * 1000;
+// How far back punches are read to tell clock-ins from clock-outs. Any gap
+// longer than the session window (a day off) puts the reading back in step.
+const PUNCH_HISTORY_MS = 31 * 24 * 60 * 60 * 1000;
 
 type ClockAction = 'in' | 'out';
 
@@ -279,11 +282,11 @@ export class KioskController {
     return (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3]));
   }
 
-  /** Punches in the session window, grouped by employee number, oldest first. */
+  /** Recent punches, grouped by employee number, oldest first. */
   private async recentPunches(empNumber?: string) {
     const logs = await this.rawLogModel
       .find({
-        timestamp: { $gte: new Date(Date.now() - SESSION_WINDOW_MS) },
+        timestamp: { $gte: new Date(Date.now() - PUNCH_HISTORY_MS) },
         ...(empNumber ? { deviceUserId: empNumber } : {}),
       })
       .select('deviceUserId timestamp')
@@ -298,12 +301,19 @@ export class KioskController {
     return byEmployee;
   }
 
-  // Punches alternate in, out, in, out… so an odd count means clocked in.
+  // Punches alternate in, out, in, out… A punch closes the open clock-in, unless
+  // that clock-in has expired (a forgotten clock-out): then it starts a new
+  // session. Walking the history keeps a 17:00 clock-out a clock-out, even once
+  // its 08:00 clock-in is more than a session window old.
   private stateOf(punches: Date[]) {
-    const clockedIn = punches.length % 2 === 1;
-    return {
-      clockedIn,
-      since: clockedIn ? punches[punches.length - 1].toISOString() : null,
-    };
+    const expired = (clockIn: Date, at: number) =>
+      at - clockIn.getTime() > SESSION_WINDOW_MS;
+
+    let open: Date | null = null;
+    for (const punch of punches) {
+      open = open && !expired(open, punch.getTime()) ? null : punch;
+    }
+    const since = open && !expired(open, Date.now()) ? open : null;
+    return { clockedIn: since !== null, since: since?.toISOString() ?? null };
   }
 }
