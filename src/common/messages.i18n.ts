@@ -351,6 +351,17 @@ const PATTERNS: [
     () => 'Avance introuvable',
     () => 'التسبيق غير موجود',
   ],
+  [
+    /^An advance for employee (.+) on (.+) already exists\.?$/,
+    (m) => `Une avance existe déjà pour l'employé ${m[1]} le ${m[2]}`,
+    (m) => `يوجد تسبيق بالفعل للموظف ${m[1]} بتاريخ ${m[2]}`,
+  ],
+  // Users never need the record's id
+  [
+    /^Worktime with id .+ not found$/,
+    () => "Cet enregistrement de temps de travail n'existe plus",
+    () => 'سجل وقت العمل هذا لم يعد موجودًا',
+  ],
 ];
 
 export function translateMessage(message: string, lang: ApiLang): string {
