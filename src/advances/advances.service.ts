@@ -1,7 +1,9 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Advance, AdvanceDocument } from './advance.schema';
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 @Injectable()
 export class AdvancesService {
@@ -14,6 +16,10 @@ export class AdvancesService {
    * "same week/period", preventing accidental duplicate advances.
    */
   async create(data: { emp_id: number; amount: number; date: string; reason?: string }): Promise<AdvanceDocument> {
+    const amount = Number(data.amount);
+    if (!Number.isFinite(amount) || amount <= 0) throw new BadRequestException('amount must be greater than 0');
+    if (!ISO_DATE.test(String(data.date))) throw new BadRequestException('date must be YYYY-MM-DD');
+
     const targetDate = new Date(data.date);
 
     const existing = await this.advanceModel
@@ -28,7 +34,7 @@ export class AdvancesService {
 
     return this.advanceModel.create({
       emp_id: data.emp_id,
-      amount: data.amount,
+      amount,
       date: targetDate,
       reason: data.reason,
     });
