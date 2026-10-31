@@ -180,6 +180,10 @@ const EXACT: Record<string, Tr> = {
     fr: 'Choisissez Arrivée ou Départ',
     ar: 'اختر الحضور أو الانصراف',
   },
+  'No clocking machine is set up for this company': {
+    fr: "Aucune pointeuse n'est configurée pour cette entreprise",
+    ar: 'لا يوجد جهاز تسجيل حضور مُعدّ لهذه الشركة',
+  },
   'Invalid attendance log ID': {
     fr: 'Identifiant de pointage invalide',
     ar: 'معرّف تسجيل الحضور غير صالح',
