@@ -8,6 +8,8 @@ import { Model, Types } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
 
 import { AttendanceDeviceService } from '../attendance-device/attendance-device.service';
+import { CompaniesService } from '../companies/companies.service';
+import { currentCompanyId } from '../tenancy/tenant-context';
 
 import {
   Employee,
@@ -33,7 +35,20 @@ export class AttendanceService {
     private employeeModel: Model<EmployeeDocument>,
 
     private deviceService: AttendanceDeviceService,
+
+    private companiesService: CompaniesService,
   ) {}
+
+  // The company's clock, as in "+01:00"; Algeria when it can't be read
+  private async utcOffset() {
+    const companyId = currentCompanyId();
+    const company = companyId
+      ? await this.companiesService.findById(companyId)
+      : null;
+    const offset = company?.settings?.utcOffset ?? '';
+
+    return /^[+-]\d{2}:\d{2}$/.test(offset) ? offset : '+01:00';
+  }
 
  async updateDeviceLog(id: string, timestamp: string) {
   if (!Types.ObjectId.isValid(id)) {
@@ -214,17 +229,21 @@ export class AttendanceService {
     const filter: any = {};
 
     if (from || to) {
+      // Days are the company's days, not UTC ones: at 00:30 in Algeria, UTC
+      // is still on the day before.
+      const offset = await this.utcOffset();
+
       filter.timestamp = {};
 
       if (from) {
         filter.timestamp.$gte = new Date(
-          `${from}T00:00:00.000Z`,
+          `${from}T00:00:00.000${offset}`,
         );
       }
 
       if (to) {
         filter.timestamp.$lte = new Date(
-          `${to}T23:59:59.999Z`,
+          `${to}T23:59:59.999${offset}`,
         );
       }
     }
