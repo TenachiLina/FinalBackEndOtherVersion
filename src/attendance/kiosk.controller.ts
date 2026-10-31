@@ -224,10 +224,14 @@ export class KioskController {
       if (worked < 0) worked += 1440;
       data.work_hours = formatMin(worked);
       if (shift?.endTime) {
+        // Everything on the shift's timeline: past midnight means + 24 h
+        const start = toMinutes(shift.startTime.slice(0, 5));
         let end = toMinutes(shift.endTime.slice(0, 5));
+        if (end <= start) end += 1440;
+        let clockedIn = toMinutes(clockIn);
+        if (start - clockedIn > 720) clockedIn += 1440;
         let out = toMinutes(clockOut);
-        if (end === 0) end = 1440;
-        if (end === 1440 && out < 720) out += 1440;
+        if (out < clockedIn) out += 1440;
         data.overtime_minutes = String(Math.max(out - end, 0));
       }
     }
