@@ -68,7 +68,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const res = http.getResponse<Response>();
     if (res.headersSent) return;
     const request = http.getRequest();
-    const { status, message, code } = this.translate(exception);
+    const { status, message, code, usageCount } = this.translate(exception);
     // A code the user can pass on, to find this exact error in the log
     const reference = status >= 500 ? newReference() : undefined;
     this.record(exception, request, status, message, reference);
@@ -83,6 +83,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       error: HttpStatus[status]?.replace(/_/g, ' ').toLowerCase() ?? 'error',
       message: localized,
       ...(code && { code }),
+      ...(usageCount !== undefined && { usageCount }),
       ...(reference && { reference }),
     });
   }
@@ -136,13 +137,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
     status: number;
     message: string | string[];
     code?: string;
+    usageCount?: number;
   } {
     if (e instanceof HttpException) {
       const body = e.getResponse() as any;
       // A machine-readable reason, e.g. TOKEN_EXPIRED (see auth/security.config.ts)
       const code = typeof body?.code === 'string' ? body.code : undefined;
-      const message =
-        typeof body === 'string' ? body : (body?.message ?? e.message);
+      const message = typeof body === 'string' ? body : (body?.message ?? e.message);
+      const usageCount = typeof body?.usageCount === 'number' ? body.usageCount : undefined;
       // Nest reports unreadable request bodies with the JSON parser's own text
       if (
         e.getStatus() === 400 &&
@@ -151,7 +153,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       ) {
         return { status: 400, message: 'The data sent was not valid' };
       }
-      return { status: e.getStatus(), message, code };
+      return { status: e.getStatus(), message, code, usageCount };
     }
 
     if (e instanceof TenantContextError) {
