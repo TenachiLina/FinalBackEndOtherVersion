@@ -21,11 +21,44 @@ export class WorktimeService {
   // CREATE
   // ───────────────────────────────────────────────────────────────────────────
 
+  // One record per employee, shift and day: a second save (two tabs, the kiosk
+  // and a manager, a double click) updates the first, so a day is never paid twice.
   async create(
     data: Partial<Worktime>,
   ): Promise<WorktimeDocument> {
 
-    return this.worktimeModel.create(data);
+    // Without them there is no day to look for: Mongoose would drop an
+    // undefined key from the filter and overwrite someone else's record.
+    if (data.emp_id == null || !data.work_date) {
+      return this.worktimeModel.create(data);
+    }
+
+    const save = () =>
+      this.worktimeModel
+        .findOneAndUpdate(
+          {
+            emp_id: data.emp_id,
+            shift_id: data.shift_id ?? null,
+            work_date: data.work_date,
+          },
+          {
+            $set: data,
+          },
+          {
+            new: true,
+            upsert: true,
+            runValidators: true,
+          },
+        )
+        .exec() as Promise<WorktimeDocument>;
+
+    try {
+      return await save();
+    } catch (err: any) {
+      // Two saves raced to insert: the other one won, so update its record
+      if (err?.code !== 11000) throw err;
+      return save();
+    }
   }
 
   // ───────────────────────────────────────────────────────────────────────────
