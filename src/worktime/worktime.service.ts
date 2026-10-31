@@ -9,6 +9,14 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
+// A client may send "" for "no time": it is stored as null, like a cleared time
+function emptyTimesToNull(data: Partial<Worktime>): Partial<Worktime> {
+  const clean = { ...data };
+  if (clean.clock_in === '') clean.clock_in = null;
+  if (clean.clock_out === '') clean.clock_out = null;
+  return clean;
+}
+
 @Injectable()
 export class WorktimeService {
 
@@ -24,8 +32,10 @@ export class WorktimeService {
   // One record per employee, shift and day: a second save (two tabs, the kiosk
   // and a manager, a double click) updates the first, so a day is never paid twice.
   async create(
-    data: Partial<Worktime>,
+    body: Partial<Worktime>,
   ): Promise<WorktimeDocument> {
+
+    const data = emptyTimesToNull(body);
 
     // Without them there is no day to look for: Mongoose would drop an
     // undefined key from the filter and overwrite someone else's record.
@@ -184,7 +194,7 @@ export class WorktimeService {
         .findByIdAndUpdate(
           id,
           {
-            $set: data,
+            $set: emptyTimesToNull(data),
           },
           {
             new: true,
