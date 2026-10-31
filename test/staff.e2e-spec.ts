@@ -286,7 +286,7 @@ describe('shifts', () => {
   });
 
   // BUG-204: a shift still used in the planning is deleted at once (no 409, ?force ignored)
-  it.failing(
+  it(
     'asks before deleting a shift that is still in the planning, then deletes with force',
     async () => {
       const { company, admin } = await setup();
