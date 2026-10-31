@@ -1,15 +1,32 @@
 // src/attendance-device/attendance-device.service.ts
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import ZKLib from 'node-zklib';
+import { currentCompanyId } from '../tenancy/tenant-context';
 
 @Injectable()
 export class AttendanceDeviceService {
   private readonly logger = new Logger(AttendanceDeviceService.name);
   private zkInstance: any;
 
+  // DEVICE_IP is one company's machine and DEVICE_COMPANY_ID says which one:
+  // no other company may reach it, and with no owner set, nobody can.
+  private machineIp() {
+    const owner = process.env.DEVICE_COMPANY_ID;
+    return owner && currentCompanyId() === owner
+      ? process.env.DEVICE_IP
+      : undefined;
+  }
+
  async connect() {
+  const ip = this.machineIp();
+  if (!ip) {
+    throw new BadRequestException(
+      'No clocking machine is set up for this company',
+    );
+  }
+
   this.zkInstance = new ZKLib(
-    process.env.DEVICE_IP,
+    ip,
     4370,
     10000,
     4000,
@@ -44,7 +61,7 @@ export class AttendanceDeviceService {
 
 
   async getDeviceStatus() {
-  const ip = process.env.DEVICE_IP;
+  const ip = this.machineIp();
 
   try {
     await this.connect();
