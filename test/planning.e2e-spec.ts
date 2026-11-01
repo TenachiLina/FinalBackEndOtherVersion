@@ -303,7 +303,7 @@ describe('importing a day (GET /planning/import/:date)', () => {
     await plan(ali, morning, '2026-10-20');
     await plan(sara, evening, '2026-10-20');
     await admin.delete(`/employees/${ali._id}`);
-    await admin.delete(`/shifts/${evening._id}`);
+    await admin.delete(`/shifts/${evening._id}?force=true`);
     const res = await admin.get('/planning/import/2026-10-20');
     expect(res.status).toBe(200);
     expect(res.body).toEqual([]);
