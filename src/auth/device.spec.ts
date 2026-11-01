@@ -45,7 +45,7 @@ describe('describeDevice', () => {
   });
 
   // BUG-101: Chrome, Firefox and Edge on phones are listed as another browser
-  it.failing.each([
+  it.each([
     [UA.chromeIphone, 'Chrome on iOS'],
     [UA.firefoxIphone, 'Firefox on iOS'],
     [UA.edgeAndroid, 'Edge on Android'],

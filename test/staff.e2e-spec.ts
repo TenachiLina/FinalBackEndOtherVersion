@@ -71,18 +71,15 @@ describe('employees', () => {
   });
 
   // BUG-205: the API accepts an employee without an employee number (the app requires one), then refuses a second one as a duplicate
-  it.failing(
-    'requires an employee number above 0, as the app does',
-    async () => {
-      const { admin } = await setup();
-      for (const empNumber of [undefined, 0, -3]) {
-        const res = await admin
-          .post('/employees')
-          .send({ firstName: 'A', lastName: 'One', empNumber });
-        expect(res.status).toBe(400);
-      }
-    },
-  );
+  it('requires an employee number above 0, as the app does', async () => {
+    const { admin } = await setup();
+    for (const empNumber of [undefined, 0, -3]) {
+      const res = await admin
+        .post('/employees')
+        .send({ firstName: 'A', lastName: 'One', empNumber });
+      expect(res.status).toBe(400);
+    }
+  });
 
   it('refuses text where a number is expected', async () => {
     const { admin } = await setup();
@@ -94,7 +91,7 @@ describe('employees', () => {
   });
 
   // BUG-201: an edit can blank an employee's name, which a new employee can't have
-  it.failing("refuses an edit that empties the employee's name", async () => {
+  it("refuses an edit that empties the employee's name", async () => {
     const { company, admin } = await setup();
     const emp = await seed.employee(company.id);
     const res = await admin
@@ -104,7 +101,7 @@ describe('employees', () => {
   });
 
   // BUG-202: an unknown id answers 200 with an empty body instead of 404
-  it.failing.each([
+  it.each([
     ['get', 'employees'],
     ['put', 'employees'],
     ['delete', 'employees'],
@@ -127,7 +124,7 @@ describe('employees', () => {
       firstName: 'Theirs',
     });
     const id = String(theirs._id);
-    expect((await admin.get(`/employees/${id}`)).body).toEqual({});
+    expect((await admin.get(`/employees/${id}`)).status).toBe(404);
     await admin.put(`/employees/${id}`).send({ firstName: 'Hacked' });
     await admin.delete(`/employees/${id}`);
     const stored = await t
@@ -286,28 +283,25 @@ describe('shifts', () => {
   });
 
   // BUG-204: a shift still used in the planning is deleted at once (no 409, ?force ignored)
-  it.failing(
-    'asks before deleting a shift that is still in the planning, then deletes with force',
-    async () => {
-      const { company, admin } = await setup();
-      const shift = await seed.shift(company.id);
-      const emp = await seed.employee(company.id);
-      await seed.planning(company.id, {
-        empId: String(emp._id),
-        shiftId: String(shift._id),
-        planDate: '2026-10-20',
-      });
+  it('asks before deleting a shift that is still in the planning, then deletes with force', async () => {
+    const { company, admin } = await setup();
+    const shift = await seed.shift(company.id);
+    const emp = await seed.employee(company.id);
+    await seed.planning(company.id, {
+      empId: String(emp._id),
+      shiftId: String(shift._id),
+      planDate: '2026-10-20',
+    });
 
-      const ask = await admin.delete(`/shifts/${shift._id}`);
-      expect(ask.status).toBe(409);
-      expect(ask.body.usageCount).toBe(1);
-      expect((await admin.get('/shifts?status=all')).body).toHaveLength(1);
+    const ask = await admin.delete(`/shifts/${shift._id}`);
+    expect(ask.status).toBe(409);
+    expect(ask.body.usageCount).toBe(1);
+    expect((await admin.get('/shifts?status=all')).body).toHaveLength(1);
 
-      expect(
-        (await admin.delete(`/shifts/${shift._id}?force=true`)).status,
-      ).toBe(200);
-    },
-  );
+    expect((await admin.delete(`/shifts/${shift._id}?force=true`)).status).toBe(
+      200,
+    );
+  });
 
   it("keeps each company's shifts apart", async () => {
     const { admin } = await setup();

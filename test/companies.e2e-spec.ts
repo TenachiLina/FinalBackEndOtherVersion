@@ -76,7 +76,7 @@ describe('POST /companies', () => {
   });
 
   // BUG-103: a second company whose name gives the same sign-in link name can't be created
-  it.failing('creates a second company with the same name', async () => {
+  it('creates a second company with the same name', async () => {
     expect(
       (await sa.post('/companies').send({ name: 'Pizza Roma', admin: admin() }))
         .status,
@@ -170,14 +170,11 @@ describe('PATCH /companies/:id', () => {
   });
 
   // BUG-104: a weekly advance share of 0% is refused, although the message says 0 is allowed
-  it.failing(
-    'accepts a weekly advance share of 0 (no weekly advances)',
-    async () => {
-      const res = await patch({ settings: { weeklyAdvanceRatio: 0 } });
-      expect(res.status).toBe(200);
-      expect(res.body.settings.weeklyAdvanceRatio).toBe(0);
-    },
-  );
+  it('accepts a weekly advance share of 0 (no weekly advances)', async () => {
+    const res = await patch({ settings: { weeklyAdvanceRatio: 0 } });
+    expect(res.status).toBe(200);
+    expect(res.body.settings.weeklyAdvanceRatio).toBe(0);
+  });
 
   it('sets branding, and checks the logo and colour', async () => {
     const ok = await patch({

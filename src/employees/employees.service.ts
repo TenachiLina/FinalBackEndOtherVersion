@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Employee, EmployeeDocument } from './employee.shema';
@@ -15,16 +15,23 @@ export class EmployeesService {
     return this.employeeModel.find().exec();
   }
 
- async findOne(id: string): Promise<EmployeeDocument | null> {
-  return this.employeeModel.findById(id).exec();
-}
+  async findOne(id: string): Promise<EmployeeDocument> {
+    const employee = await this.employeeModel.findById(id).exec();
+    if (!employee) throw new NotFoundException('Employee not found');
+    return employee;
+  }
 
-async update(id: string, data: Partial<Employee>): Promise<EmployeeDocument | null> {
-  return this.employeeModel.findByIdAndUpdate(id, data, { new: true }).exec();
-}
+  async update(id: string, data: Partial<Employee>): Promise<EmployeeDocument> {
+    const employee = await this.employeeModel
+      .findByIdAndUpdate(id, data, { new: true, runValidators: true })
+      .exec();
+    if (!employee) throw new NotFoundException('Employee not found');
+    return employee;
+  }
 
-async remove(id: string): Promise<EmployeeDocument | null> {
-  return this.employeeModel.findByIdAndDelete(id).exec();
-}
-
+  async remove(id: string): Promise<EmployeeDocument> {
+    const employee = await this.employeeModel.findByIdAndDelete(id).exec();
+    if (!employee) throw new NotFoundException('Employee not found');
+    return employee;
+  }
 }

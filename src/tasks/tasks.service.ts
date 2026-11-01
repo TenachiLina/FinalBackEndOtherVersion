@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Task, TaskDocument } from './task.schema';
@@ -15,15 +15,23 @@ export class TasksService {
     return this.taskModel.find().sort({ taskId: 1 }).exec();
   }
 
-  async findOne(id: string): Promise<TaskDocument | null> {
-    return this.taskModel.findById(id).exec();
+  async findOne(id: string): Promise<TaskDocument> {
+    const task = await this.taskModel.findById(id).exec();
+    if (!task) throw new NotFoundException('Task not found');
+    return task;
   }
 
-  async update(id: string, data: Partial<Task>): Promise<TaskDocument | null> {
-    return this.taskModel.findByIdAndUpdate(id, data, { new: true }).exec();
+  async update(id: string, data: Partial<Task>): Promise<TaskDocument> {
+    const task = await this.taskModel
+      .findByIdAndUpdate(id, data, { new: true, runValidators: true })
+      .exec();
+    if (!task) throw new NotFoundException('Task not found');
+    return task;
   }
 
-  async remove(id: string): Promise<TaskDocument | null> {
-    return this.taskModel.findByIdAndDelete(id).exec();
+  async remove(id: string): Promise<TaskDocument> {
+    const task = await this.taskModel.findByIdAndDelete(id).exec();
+    if (!task) throw new NotFoundException('Task not found');
+    return task;
   }
 }
