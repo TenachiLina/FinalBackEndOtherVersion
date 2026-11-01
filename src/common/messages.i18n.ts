@@ -208,6 +208,10 @@ const EXACT: Record<string, Tr> = {
   },
   'emp_id is required': { fr: "L'employé est obligatoire", ar: 'الموظف مطلوب' },
   'reason is required': { fr: 'Le motif est obligatoire', ar: 'السبب مطلوب' },
+  'Choose the month to copy and the month to copy to': {
+    fr: 'Choisissez le mois à copier et le mois de destination',
+    ar: 'اختر الشهر المراد نسخه والشهر المراد النسخ إليه',
+  },
   // generic (AllExceptionsFilter)
   'The data sent was not valid': {
     fr: 'Les données envoyées ne sont pas valides',

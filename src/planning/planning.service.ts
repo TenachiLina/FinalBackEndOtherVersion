@@ -7,6 +7,8 @@ import { Response } from "express";
 import { getBackupIds, getBackupEmployees } from './backups.util';
 import { currentCompanyId } from '../tenancy/tenant-context';
 
+const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
+
 @Injectable()
 export class PlanningService {
   constructor(@InjectModel(Planning.name) private planningModel: Model<PlanningDocument>) {}
@@ -2183,6 +2185,16 @@ private async buildDayPlanning(
       sourceMonth: string,
       destinationMonth: string,
     ) {
+      if (
+        ![sourceMonth, destinationMonth].every(
+          (month) => typeof month === 'string' && MONTH.test(month),
+        )
+      ) {
+        throw new BadRequestException(
+          'Choose the month to copy and the month to copy to',
+        );
+      }
+
       const [sourceYear, sourceMonthNumber] =
         sourceMonth.split("-").map(Number);
 

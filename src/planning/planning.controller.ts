@@ -180,8 +180,8 @@ export class PlanningController {
     },
   ) {
     return this.planningService.copyMonth(
-      body.sourceMonth,
-      body.destinationMonth,
+      body?.sourceMonth,
+      body?.destinationMonth,
     );
   }
 }
