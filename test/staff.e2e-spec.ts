@@ -71,7 +71,7 @@ describe('employees', () => {
   });
 
   // BUG-205: the API accepts an employee without an employee number (the app requires one), then refuses a second one as a duplicate
-  it.failing(
+  it(
     'requires an employee number above 0, as the app does',
     async () => {
       const { admin } = await setup();
