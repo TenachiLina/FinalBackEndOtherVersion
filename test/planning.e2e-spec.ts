@@ -112,7 +112,7 @@ describe('single entries', () => {
   });
 
   // BUG-202 (also here): an unknown planning id answers 200 with an empty body
-  it.failing.each([['get'], ['put'], ['delete']])(
+  it.each([['get'], ['put'], ['delete']])(
     '%s /planning/:id with an unknown id → 404',
     async (method) => {
       const { admin } = await setup();
