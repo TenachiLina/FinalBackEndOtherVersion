@@ -120,6 +120,14 @@ const EXACT: Record<string, Tr> = {
     fr: "Vous ne pouvez pas voir ni modifier les informations d'un autre responsable",
     ar: 'لا يمكنك رؤية معلومات مسؤول آخر أو تعديلها',
   },
+  'Only an admin can change your salary': {
+    fr: 'Seul un administrateur peut modifier votre salaire',
+    ar: 'يمكن للمدير فقط تعديل راتبك',
+  },
+  "You can't delete your own employee record": {
+    fr: 'Vous ne pouvez pas supprimer votre propre fiche employé',
+    ar: 'لا يمكنك حذف سجل الموظف الخاص بك',
+  },
   'You cannot remove your own admin access': {
     fr: 'Vous ne pouvez pas retirer votre propre accès administrateur',
     ar: 'لا يمكنك إزالة صلاحية المدير الخاصة بك',
@@ -180,6 +188,10 @@ const EXACT: Record<string, Tr> = {
     fr: 'Choisissez Arrivée ou Départ',
     ar: 'اختر الحضور أو الانصراف',
   },
+  'No clocking machine is set up for this company': {
+    fr: "Aucune pointeuse n'est configurée pour cette entreprise",
+    ar: 'لا يوجد جهاز تسجيل حضور مُعدّ لهذه الشركة',
+  },
   'Invalid attendance log ID': {
     fr: 'Identifiant de pointage invalide',
     ar: 'معرّف تسجيل الحضور غير صالح',
@@ -193,6 +205,7 @@ const EXACT: Record<string, Tr> = {
     ar: 'التاريخ والوقت غير صالحين',
   },
   'Shift not found': { fr: 'Créneau introuvable', ar: 'الفترة غير موجودة' },
+  'Task not found': { fr: 'Poste introuvable', ar: 'المنصب غير موجود' },
   'Bonus not found': { fr: 'Prime introuvable', ar: 'المكافأة غير موجودة' },
   'amount must be greater than 0': {
     fr: 'Le montant doit être supérieur à 0',
@@ -204,6 +217,14 @@ const EXACT: Record<string, Tr> = {
   },
   'emp_id is required': { fr: "L'employé est obligatoire", ar: 'الموظف مطلوب' },
   'reason is required': { fr: 'Le motif est obligatoire', ar: 'السبب مطلوب' },
+  'Choose the month to copy and the month to copy to': {
+    fr: 'Choisissez le mois à copier et le mois de destination',
+    ar: 'اختر الشهر المراد نسخه والشهر المراد النسخ إليه',
+  },
+  'Invalid planning date': {
+    fr: 'Date de planning invalide',
+    ar: 'تاريخ التخطيط غير صالح',
+  },
   // generic (AllExceptionsFilter)
   'The data sent was not valid': {
     fr: 'Les données envoyées ne sont pas valides',
@@ -220,6 +241,10 @@ const EXACT: Record<string, Tr> = {
   'Something went wrong on our side. Please try again.': {
     fr: 'Un problème est survenu de notre côté. Veuillez réessayer.',
     ar: 'حدث خطأ من جهتنا. يرجى المحاولة مرة أخرى.',
+  },
+  'Planning entry not found': {
+    fr: 'Entrée de planning introuvable',
+    ar: 'عنصر التخطيط غير موجود',
   },
 };
 
@@ -350,6 +375,17 @@ const PATTERNS: [
     /^Advance (.+) not found\.?$/,
     () => 'Avance introuvable',
     () => 'التسبيق غير موجود',
+  ],
+  [
+    /^An advance for employee (.+) on (.+) already exists\.?$/,
+    (m) => `Une avance existe déjà pour l'employé ${m[1]} le ${m[2]}`,
+    (m) => `يوجد تسبيق بالفعل للموظف ${m[1]} بتاريخ ${m[2]}`,
+  ],
+  // Users never need the record's id
+  [
+    /^Worktime with id .+ not found$/,
+    () => "Cet enregistrement de temps de travail n'existe plus",
+    () => 'سجل وقت العمل هذا لم يعد موجودًا',
   ],
 ];
 

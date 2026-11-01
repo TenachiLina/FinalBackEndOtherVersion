@@ -70,7 +70,9 @@ export function requireHttps() {
 const FORBIDDEN_KEY = /^\$|^(__proto__|constructor|prototype)$/;
 
 export function hasForbiddenKey(value: unknown, depth = 0): boolean {
-  if (!value || typeof value !== 'object' || depth > 20) return false;
+  if (!value || typeof value !== 'object') return false;
+  // Fails closed: what isn't checked isn't let through. No form nests this deep.
+  if (depth > 20) return true;
   if (Array.isArray(value)) {
     return value.some((v) => hasForbiddenKey(v, depth + 1));
   }
