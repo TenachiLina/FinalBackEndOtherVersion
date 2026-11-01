@@ -226,7 +226,7 @@ describe('PATCH /users/:id', () => {
   });
 
   // BUG-102: two admins demoting each other at the same moment leave the company with no admin
-  it.failing(
+  it(
     'keeps one active admin when two admins demote each other at once',
     async () => {
       const { company, adminUser, admin } = await setup();
