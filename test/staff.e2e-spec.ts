@@ -94,7 +94,7 @@ describe('employees', () => {
   });
 
   // BUG-201: an edit can blank an employee's name, which a new employee can't have
-  it.failing("refuses an edit that empties the employee's name", async () => {
+  it("refuses an edit that empties the employee's name", async () => {
     const { company, admin } = await setup();
     const emp = await seed.employee(company.id);
     const res = await admin
@@ -104,7 +104,7 @@ describe('employees', () => {
   });
 
   // BUG-202: an unknown id answers 200 with an empty body instead of 404
-  it.failing.each([
+  it.each([
     ['get', 'employees'],
     ['put', 'employees'],
     ['delete', 'employees'],
@@ -127,7 +127,7 @@ describe('employees', () => {
       firstName: 'Theirs',
     });
     const id = String(theirs._id);
-    expect((await admin.get(`/employees/${id}`)).body).toEqual({});
+    expect((await admin.get(`/employees/${id}`)).status).toBe(404);
     await admin.put(`/employees/${id}`).send({ firstName: 'Hacked' });
     await admin.delete(`/employees/${id}`);
     const stored = await t

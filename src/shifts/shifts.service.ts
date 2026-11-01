@@ -20,12 +20,18 @@ export class ShiftsService {
     return this.shiftModel.find(filter).exec();
   }
 
-  async findOne(id: string): Promise<ShiftDocument | null> {
-    return this.shiftModel.findById(id).exec();
+  async findOne(id: string): Promise<ShiftDocument> {
+    const shift = await this.shiftModel.findById(id).exec();
+    if (!shift) throw new NotFoundException('Shift not found');
+    return shift;
   }
 
-  async update(id: string, data: Partial<Shift>): Promise<ShiftDocument | null> {
-    return this.shiftModel.findByIdAndUpdate(id, data, { new: true }).exec();
+  async update(id: string, data: Partial<Shift>): Promise<ShiftDocument> {
+    const shift = await this.shiftModel
+      .findByIdAndUpdate(id, data, { new: true, runValidators: true })
+      .exec();
+    if (!shift) throw new NotFoundException('Shift not found');
+    return shift;
   }
 
   async setArchived(id: string, isArchived: boolean): Promise<ShiftDocument> {
