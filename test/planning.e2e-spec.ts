@@ -243,17 +243,35 @@ describe('saving a day (POST /planning/bulk)', () => {
     ).toHaveLength(1);
   });
 
-  // BUG-302: saving a day without the list of entries crashes (500) after deleting the day
-  it.failing('refuses a save without entries, and keeps the day', async () => {
+  it.each([
+    ['without entries', { planDate: '2026-10-20' }],
+    [
+      'with entries that are not a list',
+      { planDate: '2026-10-20', entries: 'x' },
+    ],
+    [
+      'with an entry that is empty',
+      { planDate: '2026-10-20', entries: [null] },
+    ],
+  ])('refuses a save %s, and keeps the day', async (_name, body) => {
     const { admin, morning, ali, plan } = await setup();
     await plan(ali, morning, '2026-10-20');
-    const res = await admin
-      .post('/planning/bulk')
-      .send({ planDate: '2026-10-20' });
+    const res = await admin.post('/planning/bulk').send(body);
     expect(res.status).toBe(400);
     expect(
       (await admin.get('/planning?planDate=2026-10-20')).body,
     ).toHaveLength(1);
+  });
+
+  it.each([
+    ['no date', {}],
+    ['an unreadable date', { planDate: 'soon' }],
+  ])('refuses a save with %s', async (_name, date) => {
+    const { admin } = await setup();
+    const res = await admin
+      .post('/planning/bulk')
+      .send({ ...date, entries: [] });
+    expect(res.status).toBe(400);
   });
 });
 
@@ -280,8 +298,7 @@ describe('importing a day (GET /planning/import/:date)', () => {
     expect((await admin.get('/planning/import/2026-10-21')).body).toEqual([]);
   });
 
-  // BUG-303: importing a day crashes (500) when one of its employees or shifts was deleted
-  it.failing('skips entries whose employee or shift was deleted', async () => {
+  it('skips entries whose employee or shift was deleted', async () => {
     const { admin, morning, evening, ali, sara, plan } = await setup();
     await plan(ali, morning, '2026-10-20');
     await plan(sara, evening, '2026-10-20');
@@ -290,6 +307,15 @@ describe('importing a day (GET /planning/import/:date)', () => {
     const res = await admin.get('/planning/import/2026-10-20');
     expect(res.status).toBe(200);
     expect(res.body).toEqual([]);
+  });
+
+  it('keeps the other entries of a day with a deleted employee', async () => {
+    const { admin, morning, ali, sara, plan } = await setup();
+    await plan(ali, morning, '2026-10-20');
+    await plan(sara, morning, '2026-10-20');
+    await admin.delete(`/employees/${ali._id}`);
+    const res = await admin.get('/planning/import/2026-10-20');
+    expect(res.body.map((e: any) => e.title)).toEqual(['Sara Kaci']);
   });
 });
 
@@ -357,45 +383,55 @@ describe('copying a month (POST /planning/copy-month)', () => {
     ).toHaveLength(1);
   });
 
-  // BUG-304: copying a month deletes the whole destination month, also the weekdays it doesn't copy
-  it.failing(
-    'keeps the destination days of weekdays the source month has no planning for',
-    async () => {
-      const { admin, morning, ali, omar, plan } = await setup();
-      await plan(ali, morning, '2026-09-01'); // only a Tuesday
-      await plan(omar, morning, '2026-11-05'); // a Thursday
-      await admin
-        .post('/planning/copy-month')
-        .send({ sourceMonth: '2026-09', destinationMonth: '2026-11' });
-      expect(names(await admin.get('/planning?planDate=2026-11-05'))).toEqual([
-        'Omar@2026-11-05',
-      ]);
-    },
-  );
-
-  // BUG-305: "the first Tuesday" is the Tuesday saved first, not the earliest one
-  it.failing(
-    'uses the earliest day of each weekday, whatever order the days were saved in',
-    async () => {
-      const { admin, morning, ali, sara, plan } = await setup();
-      await plan(sara, morning, '2026-09-08'); // saved first
-      await plan(ali, morning, '2026-09-01');
-      await admin
-        .post('/planning/copy-month')
-        .send({ sourceMonth: '2026-09', destinationMonth: '2026-11' });
-      expect(names(await admin.get('/planning?planDate=2026-11-03'))).toEqual([
-        'Ali@2026-11-03',
-      ]);
-    },
-  );
-
-  // BUG-301 (also here): a month that doesn't exist is read as another month
-  it.failing('refuses a month that does not exist', async () => {
-    const { admin } = await setup();
-    const res = await admin
+  it('keeps the destination days of weekdays the source month has no planning for', async () => {
+    const { admin, morning, ali, omar, plan } = await setup();
+    await plan(ali, morning, '2026-09-01'); // only a Tuesday
+    await plan(omar, morning, '2026-11-05'); // a Thursday
+    await admin
       .post('/planning/copy-month')
-      .send({ sourceMonth: '2026-13', destinationMonth: '2026-11' });
+      .send({ sourceMonth: '2026-09', destinationMonth: '2026-11' });
+    expect(names(await admin.get('/planning?planDate=2026-11-05'))).toEqual([
+      'Omar@2026-11-05',
+    ]);
+  });
+
+  it('uses the earliest day of each weekday, whatever order the days were saved in', async () => {
+    const { admin, morning, ali, sara, plan } = await setup();
+    await plan(sara, morning, '2026-09-08'); // saved first
+    await plan(ali, morning, '2026-09-01');
+    await admin
+      .post('/planning/copy-month')
+      .send({ sourceMonth: '2026-09', destinationMonth: '2026-11' });
+    expect(names(await admin.get('/planning?planDate=2026-11-03'))).toEqual([
+      'Ali@2026-11-03',
+    ]);
+  });
+
+  it.each([
+    ['nothing', {}],
+    [
+      'a month that does not exist',
+      { sourceMonth: '2026-13', destinationMonth: '2026-11' },
+    ],
+    [
+      'a destination that is not a month',
+      { sourceMonth: '2026-09', destinationMonth: 'next' },
+    ],
+    [
+      'a month that is not text',
+      { sourceMonth: 202609, destinationMonth: '2026-11' },
+    ],
+  ])('refuses %s, and changes nothing', async (_name, body) => {
+    const { admin, morning, omar, plan } = await setup();
+    await plan(omar, morning, '2026-11-03');
+    const res = await admin.post('/planning/copy-month').send(body);
     expect(res.status).toBe(400);
+    expect(res.body.message).toBe(
+      'Choose the month to copy and the month to copy to',
+    );
+    expect(
+      (await admin.get('/planning?planDate=2026-11-03')).body,
+    ).toHaveLength(1);
   });
 });
 
@@ -569,8 +605,7 @@ describe('exports', () => {
     });
   });
 
-  // BUG-306: the exports leave out shifts starting at 13:00, before 06:00, and late in the evening
-  it.failing.each([
+  it.each([
     ['/planning/export-first-week?year=2026&month=9', '13:00'],
     ['/planning/export-first-week?year=2026&month=9', '22:00'],
     ['/planning/export-first-week-manager?year=2026&month=9', '18:00'],
@@ -587,15 +622,44 @@ describe('exports', () => {
     expect(rows.flat().join('\n')).toContain('Ali Ben');
   });
 
-  // BUG-307: a sub-task without a start time makes the exports crash (500)
-  it.failing('exports a day whose first sub-task has no time', async () => {
+  it('lists the hours in time order, only those in use', async () => {
     const s = await setup();
-    await s.plan(s.ali, s.morning, '2026-10-03', {
-      tasks: [{ label: 'Clean' }],
-    });
-    const res = await download(
-      s.admin.get('/planning/export-current-day?year=2026&month=10&day=3'),
+    for (const [emp, start] of [
+      [s.ali, '22:00'],
+      [s.sara, '13:00'],
+      [s.omar, '00:00'],
+    ] as const) {
+      const shift = await seed.shift(s.company.id, {
+        startTime: start,
+        endTime: '23:59',
+      });
+      await s.plan(emp, shift, '2026-10-03');
+    }
+    const rows = await excelRows(
+      (
+        await download(
+          s.admin.get('/planning/export-current-day?year=2026&month=10&day=3'),
+        )
+      ).body,
     );
-    expect(res.status).toBe(200);
+    expect(rows.map((r) => r[0])).toEqual(['Hour', '00H', '13H', '22H']);
   });
+
+  it.each([
+    '/planning/export-first-week?year=2026&month=9',
+    '/planning/export-first-week-manager?year=2026&month=9',
+    '/planning/export-current-day?year=2026&month=10&day=3',
+  ])(
+    '%s lists a first sub-task without a time at the shift start',
+    async (url) => {
+      const s = await setup();
+      await s.plan(s.ali, s.morning, '2026-10-03', {
+        tasks: [{ label: 'Clean' }],
+      });
+      const res = await download(s.admin.get(url));
+      expect(res.status).toBe(200);
+      const rows = await excelRows(res.body);
+      expect(rows.find((r) => r[0] === '08H')?.join('\n')).toContain('Ali Ben');
+    },
+  );
 });
