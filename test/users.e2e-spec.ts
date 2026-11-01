@@ -226,22 +226,19 @@ describe('PATCH /users/:id', () => {
   });
 
   // BUG-102: two admins demoting each other at the same moment leave the company with no admin
-  it(
-    'keeps one active admin when two admins demote each other at once',
-    async () => {
-      const { company, adminUser, admin } = await setup();
-      const otherUser = await seed.user('admin', company.id);
-      const other = await loginAs(t, otherUser);
-      await Promise.all([
-        admin.patch(`/users/${otherUser.id}`).send({ role: 'manager' }),
-        other.patch(`/users/${adminUser.id}`).send({ role: 'manager' }),
-      ]);
-      const admins = await t
-        .model('User')
-        .countDocuments({ companyId: company.id, role: 'admin', active: true });
-      expect(admins).toBeGreaterThanOrEqual(1);
-    },
-  );
+  it('keeps one active admin when two admins demote each other at once', async () => {
+    const { company, adminUser, admin } = await setup();
+    const otherUser = await seed.user('admin', company.id);
+    const other = await loginAs(t, otherUser);
+    await Promise.all([
+      admin.patch(`/users/${otherUser.id}`).send({ role: 'manager' }),
+      other.patch(`/users/${adminUser.id}`).send({ role: 'manager' }),
+    ]);
+    const admins = await t
+      .model('User')
+      .countDocuments({ companyId: company.id, role: 'admin', active: true });
+    expect(admins).toBeGreaterThanOrEqual(1);
+  });
 
   it("can't touch another company's user", async () => {
     const { admin } = await setup();

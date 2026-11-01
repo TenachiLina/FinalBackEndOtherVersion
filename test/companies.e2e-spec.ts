@@ -170,14 +170,11 @@ describe('PATCH /companies/:id', () => {
   });
 
   // BUG-104: a weekly advance share of 0% is refused, although the message says 0 is allowed
-  it(
-    'accepts a weekly advance share of 0 (no weekly advances)',
-    async () => {
-      const res = await patch({ settings: { weeklyAdvanceRatio: 0 } });
-      expect(res.status).toBe(200);
-      expect(res.body.settings.weeklyAdvanceRatio).toBe(0);
-    },
-  );
+  it('accepts a weekly advance share of 0 (no weekly advances)', async () => {
+    const res = await patch({ settings: { weeklyAdvanceRatio: 0 } });
+    expect(res.status).toBe(200);
+    expect(res.body.settings.weeklyAdvanceRatio).toBe(0);
+  });
 
   it('sets branding, and checks the logo and colour', async () => {
     const ok = await patch({
