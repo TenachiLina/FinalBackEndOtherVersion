@@ -180,6 +180,10 @@ const EXACT: Record<string, Tr> = {
     fr: 'Choisissez Arrivée ou Départ',
     ar: 'اختر الحضور أو الانصراف',
   },
+  'No clocking machine is set up for this company': {
+    fr: "Aucune pointeuse n'est configurée pour cette entreprise",
+    ar: 'لا يوجد جهاز تسجيل حضور مُعدّ لهذه الشركة',
+  },
   'Invalid attendance log ID': {
     fr: 'Identifiant de pointage invalide',
     ar: 'معرّف تسجيل الحضور غير صالح',
@@ -205,6 +209,10 @@ const EXACT: Record<string, Tr> = {
   },
   'emp_id is required': { fr: "L'employé est obligatoire", ar: 'الموظف مطلوب' },
   'reason is required': { fr: 'Le motif est obligatoire', ar: 'السبب مطلوب' },
+  'Choose the month to copy and the month to copy to': {
+    fr: 'Choisissez le mois à copier et le mois de destination',
+    ar: 'اختر الشهر المراد نسخه والشهر المراد النسخ إليه',
+  },
   // generic (AllExceptionsFilter)
   'The data sent was not valid': {
     fr: 'Les données envoyées ne sont pas valides',
@@ -351,6 +359,17 @@ const PATTERNS: [
     /^Advance (.+) not found\.?$/,
     () => 'Avance introuvable',
     () => 'التسبيق غير موجود',
+  ],
+  [
+    /^An advance for employee (.+) on (.+) already exists\.?$/,
+    (m) => `Une avance existe déjà pour l'employé ${m[1]} le ${m[2]}`,
+    (m) => `يوجد تسبيق بالفعل للموظف ${m[1]} بتاريخ ${m[2]}`,
+  ],
+  // Users never need the record's id
+  [
+    /^Worktime with id .+ not found$/,
+    () => "Cet enregistrement de temps de travail n'existe plus",
+    () => 'سجل وقت العمل هذا لم يعد موجودًا',
   ],
 ];
 

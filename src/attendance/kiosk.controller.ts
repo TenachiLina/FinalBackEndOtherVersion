@@ -22,10 +22,13 @@ import { PlanningService } from '../planning/planning.service';
 import { CompaniesService } from '../companies/companies.service';
 import { currentCompanyId } from '../tenancy/tenant-context';
 
-// Punches older than this don't count towards "currently clocked in", so a
+// A clock-in older than this no longer counts as "currently clocked in", so a
 // forgotten clock-out doesn't block tomorrow's clock-in. Covers long and
 // overnight shifts.
 const SESSION_WINDOW_MS = 16 * 60 * 60 * 1000;
+// How far back punches are read to tell clock-ins from clock-outs. Any gap
+// longer than the session window (a day off) puts the reading back in step.
+const PUNCH_HISTORY_MS = 31 * 24 * 60 * 60 * 1000;
 
 type ClockAction = 'in' | 'out';
 
@@ -187,18 +190,15 @@ export class KioskController {
       work_date: workDate,
     });
 
-    const hasIn = existing?.clock_in && existing.clock_in !== '00:00';
-    const clockIn = hasIn
-      ? existing.clock_in!
+    const clockIn = existing?.clock_in
+      ? existing.clock_in
       : action === 'in'
         ? nowLocal.time
         : (sinceLocal?.time ?? nowLocal.time);
     const clockOut =
       action === 'out'
         ? nowLocal.time
-        : existing?.clock_out && existing.clock_out !== '00:00'
-          ? existing.clock_out
-          : null;
+        : existing?.clock_out || null;
 
     const shift = await this.plannedShift(
       empNumber,
@@ -224,10 +224,14 @@ export class KioskController {
       if (worked < 0) worked += 1440;
       data.work_hours = formatMin(worked);
       if (shift?.endTime) {
+        // Everything on the shift's timeline: past midnight means + 24 h
+        const start = toMinutes(shift.startTime.slice(0, 5));
         let end = toMinutes(shift.endTime.slice(0, 5));
+        if (end <= start) end += 1440;
+        let clockedIn = toMinutes(clockIn);
+        if (start - clockedIn > 720) clockedIn += 1440;
         let out = toMinutes(clockOut);
-        if (end === 0) end = 1440;
-        if (end === 1440 && out < 720) out += 1440;
+        if (out < clockedIn) out += 1440;
         data.overtime_minutes = String(Math.max(out - end, 0));
       }
     }
@@ -275,11 +279,11 @@ export class KioskController {
     return (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3]));
   }
 
-  /** Punches in the session window, grouped by employee number, oldest first. */
+  /** Recent punches, grouped by employee number, oldest first. */
   private async recentPunches(empNumber?: string) {
     const logs = await this.rawLogModel
       .find({
-        timestamp: { $gte: new Date(Date.now() - SESSION_WINDOW_MS) },
+        timestamp: { $gte: new Date(Date.now() - PUNCH_HISTORY_MS) },
         ...(empNumber ? { deviceUserId: empNumber } : {}),
       })
       .select('deviceUserId timestamp')
@@ -294,12 +298,19 @@ export class KioskController {
     return byEmployee;
   }
 
-  // Punches alternate in, out, in, out… so an odd count means clocked in.
+  // Punches alternate in, out, in, out… A punch closes the open clock-in, unless
+  // that clock-in has expired (a forgotten clock-out): then it starts a new
+  // session. Walking the history keeps a 17:00 clock-out a clock-out, even once
+  // its 08:00 clock-in is more than a session window old.
   private stateOf(punches: Date[]) {
-    const clockedIn = punches.length % 2 === 1;
-    return {
-      clockedIn,
-      since: clockedIn ? punches[punches.length - 1].toISOString() : null,
-    };
+    const expired = (clockIn: Date, at: number) =>
+      at - clockIn.getTime() > SESSION_WINDOW_MS;
+
+    let open: Date | null = null;
+    for (const punch of punches) {
+      open = open && !expired(open, punch.getTime()) ? null : punch;
+    }
+    const since = open && !expired(open, Date.now()) ? open : null;
+    return { clockedIn: since !== null, since: since?.toISOString() ?? null };
   }
 }

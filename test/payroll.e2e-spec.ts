@@ -112,39 +112,53 @@ describe('advances', () => {
   });
 
   // BUG-401: an advance of 0 or a negative amount is accepted
-  it.failing.each([[0], [-5000]])(
-    'refuses an advance of %d',
-    async (amount) => {
-      const { company, admin } = await setup();
-      await seed.employee(company.id, { empNumber: 4 });
-      const res = await admin
-        .post('/advances')
-        .send({ emp_id: 4, amount, date: '2026-10-05' });
-      expect(res.status).toBe(400);
-    },
-  );
+  it.each([[0], [-5000]])('refuses an advance of %d', async (amount) => {
+    const { company, admin } = await setup();
+    await seed.employee(company.id, { empNumber: 4 });
+    const res = await admin
+      .post('/advances')
+      .send({ emp_id: 4, amount, date: '2026-10-05' });
+    expect(res.status).toBe(400);
+  });
 
   // BUG-402: advances and bonuses are accepted for an employee number that doesn't exist
-  it.failing(
-    'refuses an advance or a bonus for an employee who does not exist',
-    async () => {
-      const { admin } = await setup();
-      expect(
-        (
-          await admin
-            .post('/advances')
-            .send({ emp_id: 999, amount: 100, date: '2026-10-05' })
-        ).status,
-      ).toBe(400);
-      expect(
-        (
-          await admin
-            .post('/bonuses')
-            .send({ emp_id: 999, amount: 100, date: '2026-10-05', reason: 'x' })
-        ).status,
-      ).toBe(400);
-    },
-  );
+  it('refuses an advance or a bonus for an employee who does not exist', async () => {
+    const { admin } = await setup();
+    expect(
+      (
+        await admin
+          .post('/advances')
+          .send({ emp_id: 999, amount: 100, date: '2026-10-05' })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await admin
+          .post('/bonuses')
+          .send({ emp_id: 999, amount: 100, date: '2026-10-05', reason: 'x' })
+      ).status,
+    ).toBe(400);
+  });
+
+  it('doesn’t count another company’s employee as existing', async () => {
+    const { admin } = await setup();
+    await seed.employee((await seed.company()).id, { empNumber: 55 });
+    const res = await admin
+      .post('/advances')
+      .send({ emp_id: 55, amount: 100, date: '2026-10-05' });
+    expect(res.status).toBe(400);
+    expect(res.body.message).toBe('Employee not found');
+  });
+
+  it('accepts the employee number and the amount as text', async () => {
+    const { company, admin } = await setup();
+    await seed.employee(company.id, { empNumber: 56 });
+    const res = await admin
+      .post('/advances')
+      .send({ emp_id: '56', amount: '250.50', date: '2026-10-05' });
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({ emp_id: 56, amount: 250.5 });
+  });
 
   it('hides another manager from a manager', async () => {
     const { company, me } = await withHiddenManager();
@@ -289,8 +303,6 @@ describe('work time', () => {
     expect(created.body).toMatchObject({
       emp_id: 7,
       work_date: '2026-10-20T00:00:00.000Z',
-      clock_in: '00:00',
-      clock_out: '00:00',
       work_hours: '00:00',
       penalty: 0,
       bonus: 0,
@@ -300,6 +312,45 @@ describe('work time', () => {
     expect((await admin.get(`/worktime/${created.body._id}`)).body.emp_id).toBe(
       7,
     );
+  });
+
+  it('has no clock times until they are saved', async () => {
+    const { admin } = await setup();
+    const { body } = await admin
+      .post('/worktime')
+      .send({ emp_id: 7, work_date: '2026-10-20' });
+    expect(body.clock_in ?? null).toBeNull();
+    expect(body.clock_out ?? null).toBeNull();
+  });
+
+  it('keeps a real midnight, and treats "" as no time', async () => {
+    const { admin } = await setup();
+    const created = await admin
+      .post('/worktime')
+      .send(day({ clock_in: '', clock_out: '00:00' }));
+    expect(created.body.clock_in ?? null).toBeNull();
+    expect(created.body.clock_out).toBe('00:00');
+
+    const edited = await admin
+      .put(`/worktime/${created.body._id}`)
+      .send({ clock_out: '' });
+    expect(edited.body.clock_out ?? null).toBeNull();
+  });
+
+  it('clears the times of a day with null', async () => {
+    const { admin } = await setup();
+    const { body } = await admin.post('/worktime').send(day());
+    const res = await admin
+      .put(`/worktime/${body._id}`)
+      .send({ clock_in: null, clock_out: null });
+    expect(res.body.clock_in ?? null).toBeNull();
+    expect(res.body.clock_out ?? null).toBeNull();
+
+    const again = await admin
+      .post('/worktime')
+      .send({ ...day(), clock_in: null, clock_out: null });
+    expect(again.body._id).toBe(body._id);
+    expect(again.body.clock_in ?? null).toBeNull();
   });
 
   it('finds the records of one employee, shift or day', async () => {
@@ -360,7 +411,7 @@ describe('work time', () => {
   });
 
   // BUG-403: two records can be saved for the same employee, shift and day, and payroll counts both
-  it.failing('keeps one record per employee, shift and day', async () => {
+  it('keeps one record per employee, shift and day', async () => {
     const { admin } = await setup();
     await Promise.all([
       admin.post('/worktime').send(day()),
@@ -369,6 +420,52 @@ describe('work time', () => {
     expect(
       (await admin.get('/worktime?emp_id=7&work_date=2026-10-20')).body,
     ).toHaveLength(1);
+  });
+
+  it('updates the day on a second save, and keeps what it doesn’t send', async () => {
+    const { admin } = await setup();
+    const first = await admin.post('/worktime').send(day({ penalty: 200 }));
+    const second = await admin.post('/worktime').send({
+      emp_id: 7,
+      shift_id: 's1',
+      work_date: '2026-10-20',
+      clock_out: '17:00',
+    });
+    expect(second.status).toBe(201);
+    expect(second.body).toMatchObject({
+      _id: first.body._id,
+      clock_in: '08:05',
+      clock_out: '17:00',
+      penalty: 200,
+    });
+  });
+
+  it('keeps one record for a day without a shift', async () => {
+    const { admin } = await setup();
+    const body = { emp_id: 7, work_date: '2026-10-20' };
+    await admin.post('/worktime').send(body);
+    await admin.post('/worktime').send(body);
+    expect((await admin.get('/worktime')).body).toHaveLength(1);
+  });
+
+  it('never lands a save without an employee on someone else’s record', async () => {
+    const { admin } = await setup();
+    await admin.post('/worktime').send(day());
+    const res = await admin
+      .post('/worktime')
+      .send({ shift_id: 's1', work_date: '2026-10-20', clock_in: '23:59' });
+    expect(res.status).toBe(400);
+    const [kept] = (await admin.get('/worktime')).body;
+    expect(kept).toMatchObject({ emp_id: 7, clock_in: '08:05' });
+  });
+
+  it('keeps two companies’ days apart', async () => {
+    const a = await setup();
+    const b = await setup();
+    await a.admin.post('/worktime').send(day());
+    await b.admin.post('/worktime').send(day({ clock_in: '09:00' }));
+    expect((await a.admin.get('/worktime')).body[0].clock_in).toBe('08:05');
+    expect((await b.admin.get('/worktime')).body[0].clock_in).toBe('09:00');
   });
 
   describe('the report', () => {

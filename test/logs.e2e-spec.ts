@@ -1,6 +1,7 @@
 import { Types } from 'mongoose';
 import { api, createTestApp, type TestApp } from './helpers/app';
 import { loginAs, PASSWORD, seeder } from './helpers/seed';
+import { PlanningService } from '../src/planning/planning.service';
 
 // The activity log (who changed what) and the system error log.
 
@@ -85,8 +86,7 @@ describe('the activity log', () => {
     expect(entry).toMatchObject({ statusCode: 404, error: 'Shift not found' });
   });
 
-  // BUG-005: a change the database refuses (missing field, duplicate) is logged as a 500 with Mongoose's raw text
-  it.failing.each([
+  it.each([
     [{ empNumber: 5 }, 400],
     [{ empNumber: 6, firstName: 'C', lastName: 'D' }, 409],
   ])(
@@ -103,8 +103,32 @@ describe('the activity log', () => {
       });
       expect(entry.statusCode).toBe(status);
       expect(entry.error).not.toMatch(/Path `|E11000/);
+      expect(entry.error).toContain(
+        status === 400
+          ? 'First name is required'
+          : 'The employee number "6" is already used',
+      );
     },
   );
+
+  it('keeps the real error of a crash, not the generic message', async () => {
+    const { company, admin } = await setup();
+    const crash = jest
+      .spyOn(t.app.get(PlanningService), 'copyMonth')
+      .mockRejectedValueOnce(new TypeError('Boom in the planning'));
+    const res = await admin.post('/planning/copy-month').send({});
+    crash.mockRestore();
+    expect(res.status).toBe(500);
+    const entry = await logEntry({
+      action: 'planning.copyMonth',
+      success: false,
+      companyId: new Types.ObjectId(company.id),
+    });
+    expect(entry).toMatchObject({
+      statusCode: 500,
+      error: 'Boom in the planning',
+    });
+  });
 
   it('keeps passwords out of the log', async () => {
     const { admin } = await setup();
@@ -324,8 +348,7 @@ describe('the activity log', () => {
       );
     });
 
-    // BUG-004: the activity and error logs filter days in UTC, so in Algeria 00:00–00:59 lands on the day before
-    it.failing("filters days in the company's time zone", async () => {
+    it("filters days in the company's time zone", async () => {
       const { company, admin } = await setup();
       await t.model('AuditLog').collection.insertOne({
         companyId: new Types.ObjectId(company.id),
@@ -338,6 +361,27 @@ describe('the activity log', () => {
       expect(
         targets(await admin.get('/audit-logs?from=2026-10-20&to=2026-10-20')),
       ).toEqual(['just after midnight in Algeria']);
+      expect(
+        targets(await admin.get('/audit-logs?from=2026-10-19&to=2026-10-19')),
+      ).toEqual([]);
+    });
+
+    it('stays in UTC for the super admin outside any company', async () => {
+      const { company } = await setup();
+      const target = `midnight ${new Types.ObjectId().toString()}`;
+      await t.model('AuditLog').collection.insertOne({
+        companyId: new Types.ObjectId(company.id),
+        action: 'x',
+        method: 'POST',
+        path: '/x',
+        target,
+        createdAt: new Date('2026-10-19T23:30:00Z'),
+      });
+      const sa = await loginAs(t, await seed.user('superadmin', null));
+      const found = (day: string) =>
+        sa.get(`/audit-logs?from=${day}&to=${day}&search=${target}`);
+      expect((await found('2026-10-19')).body.total).toBe(1);
+      expect((await found('2026-10-20')).body.total).toBe(0);
     });
   });
 });
@@ -345,7 +389,11 @@ describe('the activity log', () => {
 describe('the error log', () => {
   it('saves a server crash with a reference the user can quote, and the request', async () => {
     const { adminUser, admin } = await setup();
+    const crash = jest
+      .spyOn(t.app.get(PlanningService), 'copyMonth')
+      .mockRejectedValueOnce(new TypeError('Boom in the planning'));
     const res = await admin.post('/planning/copy-month').send({});
+    crash.mockRestore();
     expect(res.status).toBe(500);
     const entry = await errorEntry({ reference: res.body.reference });
     expect(entry).toMatchObject({
@@ -356,7 +404,7 @@ describe('the error log', () => {
       method: 'POST',
       path: '/planning/copy-month',
       userId: new Types.ObjectId(adminUser.id),
-      where: expect.stringContaining('planning/planning.service.ts'),
+      where: expect.stringContaining('logs.e2e-spec.ts'),
     });
   });
 
@@ -471,9 +519,29 @@ describe('the error log', () => {
       expect(await count('level=warning')).toBe(1);
       expect(await count('source=frontend')).toBe(0);
       expect(await count('fingerprint=f1')).toBe(2);
-      const today = new Date().toISOString().slice(0, 10);
+      // Today on the company's clock (UTC+1)
+      const today = new Date(Date.now() + 60 * 60 * 1000)
+        .toISOString()
+        .slice(0, 10);
       expect(await count(`from=${today}&to=${today}`)).toBe(3);
       expect((await sa.get('/error-logs?limit=1')).body.items).toHaveLength(1);
+    });
+
+    it("filters days in the company's time zone", async () => {
+      const { a } = await withErrors();
+      await t.model('ErrorLog').collection.insertOne({
+        companyId: new Types.ObjectId(a.id),
+        level: 'error',
+        message: 'just after midnight in Algeria',
+        createdAt: new Date('2026-10-19T23:30:00Z'), // 20 Oct, 00:30 in Algeria
+      });
+      const sa = await loginAs(t, await seed.user('superadmin', null), {
+        companyId: a.id,
+      });
+      const total = async (day: string) =>
+        (await sa.get(`/error-logs?from=${day}&to=${day}`)).body.total;
+      expect(await total('2026-10-20')).toBe(1);
+      expect(await total('2026-10-19')).toBe(0);
     });
 
     it('groups the last 7 days by error, errors first, with the people affected', async () => {

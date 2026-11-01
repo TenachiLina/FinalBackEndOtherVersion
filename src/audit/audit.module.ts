@@ -7,9 +7,11 @@ import { AuditService } from './audit.service';
 import { AuditController } from './audit.controller';
 import { AuditInterceptor } from './audit.interceptor';
 import { AuditChanges } from './audit-changes';
+import { CompaniesModule } from '../companies/companies.module';
 
 @Module({
   imports: [
+    CompaniesModule,
     MongooseModule.forFeature([
       { name: AuditLog.name, schema: AuditLogSchema },
       { name: User.name, schema: UserSchema },

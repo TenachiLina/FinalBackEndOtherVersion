@@ -200,11 +200,20 @@ describe('hasForbiddenKey', () => {
     expect(hasForbiddenKey({ prototype: 1 })).toBe(true);
   });
 
-  // BUG-001: an operator nested more than 20 levels deep is let through
-  it.failing('finds an operator hidden deeper than 20 levels', () => {
+  it('finds an operator hidden deeper than 20 levels', () => {
     let body: any = { $ne: '' };
     for (let i = 0; i < 25; i++) body = { a: body };
     expect(hasForbiddenKey(body)).toBe(true);
+  });
+
+  it('fails closed: what is too deep to check is refused, and the rest is not', () => {
+    const nested = (levels: number) => {
+      let body: any = 'x';
+      for (let i = 0; i < levels; i++) body = { a: body };
+      return body;
+    };
+    expect(hasForbiddenKey(nested(20))).toBe(false);
+    expect(hasForbiddenKey(nested(25))).toBe(true);
   });
 });
 

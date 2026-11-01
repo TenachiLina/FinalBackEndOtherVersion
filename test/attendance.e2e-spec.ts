@@ -23,8 +23,9 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-async function setup() {
+async function setup(ownsMachine = true) {
   const company = await seed.company();
+  if (ownsMachine) process.env.DEVICE_COMPANY_ID = company.id;
   const admin = await loginAs(t, await seed.user('admin', company.id));
   return { company, admin };
 }
@@ -56,7 +57,11 @@ describe('POST /attendance/sync', () => {
 
     const saved = await punches(company.id);
     expect(saved).toHaveLength(3);
-    expect(saved.find((p: any) => p.deviceLogId === '3')).toMatchObject({
+    expect(
+      saved.find(
+        (p: any) => p.timestamp.toISOString() === '2026-10-20T16:00:00.000Z',
+      ),
+    ).toMatchObject({
       deviceUserId: '7',
       processed: false,
     });
@@ -70,9 +75,57 @@ describe('POST /attendance/sync', () => {
       devicePunch(2, '7', '2026-10-20T07:00:00Z'),
     ];
     expect((await admin.post('/attendance/sync')).body.status).toBe('success');
-    expect((await punches(company.id)).map((p: any) => p.deviceLogId)).toEqual([
-      '2',
-    ]);
+    expect(
+      (await punches(company.id)).map((p: any) => p.timestamp.toISOString()),
+    ).toEqual(['2026-10-20T07:00:00.000Z']);
+  });
+
+  it('skips a punch without an employee', async () => {
+    const { company, admin } = await setup();
+    fakeDevice.attendances = [
+      { userSn: 1, recordTime: new Date('2026-10-20T07:00:00Z') },
+    ];
+    expect((await admin.post('/attendance/sync')).body.status).toBe('success');
+    expect(await punches(company.id)).toEqual([]);
+  });
+
+  it('doesn’t bring back a punch a manager corrected by hand', async () => {
+    const { company, admin } = await setup();
+    fakeDevice.attendances = [devicePunch(1, '7', '2026-10-20T07:00:00Z')];
+    await admin.post('/attendance/sync');
+    const [punch] = await punches(company.id);
+    await admin
+      .patch(`/attendance/device-logs/${punch._id}`)
+      .send({ timestamp: '2026-10-20T07:30:00Z' });
+
+    await admin.post('/attendance/sync');
+
+    const saved = await punches(company.id);
+    expect(saved).toHaveLength(1);
+    expect(saved[0].timestamp.toISOString()).toBe('2026-10-20T07:30:00.000Z');
+  });
+
+  it('recognises punches saved with the old record numbers', async () => {
+    const { company, admin } = await setup();
+    await runForCompany(company.id, async () => {
+      await t.model('RawAttendanceLog').create({
+        deviceUserId: '7',
+        timestamp: new Date('2026-10-20T07:00:00Z'),
+        deviceLogId: '1',
+      });
+    });
+    fakeDevice.attendances = [devicePunch(1, '7', '2026-10-20T07:00:00Z')];
+    await admin.post('/attendance/sync');
+    expect(await punches(company.id)).toHaveLength(1);
+  });
+
+  it('saves the same employee’s new punch with a number already seen', async () => {
+    const { company, admin } = await setup();
+    fakeDevice.attendances = [devicePunch(1, '7', '2026-10-20T07:00:00Z')];
+    await admin.post('/attendance/sync');
+    fakeDevice.attendances = [devicePunch(1, '7', '2026-11-02T07:00:00Z')];
+    await admin.post('/attendance/sync');
+    expect(await punches(company.id)).toHaveLength(2);
   });
 
   it('answers status "error" with the reason when the machine can’t be reached', async () => {
@@ -100,75 +153,112 @@ describe('POST /attendance/sync', () => {
   // BUG-502: punches are known by the machine's record number (userSn), which
   // starts again at 1 when the machine's log is cleared: every new punch with a
   // number already seen is dropped without a word
-  it.failing(
-    'still saves new punches after the machine’s log was cleared',
-    async () => {
-      const { company, admin } = await setup();
-      fakeDevice.attendances = [
-        devicePunch(1, '7', '2026-10-20T07:00:00Z'),
-        devicePunch(2, '7', '2026-10-20T16:00:00Z'),
-      ];
-      await admin.post('/attendance/sync');
+  it('still saves new punches after the machine’s log was cleared', async () => {
+    const { company, admin } = await setup();
+    fakeDevice.attendances = [
+      devicePunch(1, '7', '2026-10-20T07:00:00Z'),
+      devicePunch(2, '7', '2026-10-20T16:00:00Z'),
+    ];
+    await admin.post('/attendance/sync');
 
-      // The machine's memory is cleared; numbering starts again
-      fakeDevice.attendances = [
-        devicePunch(1, '8', '2026-11-02T07:00:00Z'),
-        devicePunch(2, '8', '2026-11-02T16:00:00Z'),
-      ];
-      await admin.post('/attendance/sync');
+    // The machine's memory is cleared; numbering starts again
+    fakeDevice.attendances = [
+      devicePunch(1, '8', '2026-11-02T07:00:00Z'),
+      devicePunch(2, '8', '2026-11-02T16:00:00Z'),
+    ];
+    await admin.post('/attendance/sync');
 
-      expect(await punches(company.id)).toHaveLength(4);
-    },
-  );
+    expect(await punches(company.id)).toHaveLength(4);
+  });
 
   // BUG-502 (same cause): a punch without a record number is saved as "undefined",
   // so every later one without a number is dropped
-  it.failing(
-    'saves punches the machine sent without a record number',
-    async () => {
-      const { company, admin } = await setup();
-      fakeDevice.attendances = [
-        { deviceUserId: '7', recordTime: new Date('2026-10-20T07:00:00Z') },
-        { deviceUserId: '8', recordTime: new Date('2026-10-20T07:05:00Z') },
-      ];
-      await admin.post('/attendance/sync');
-      expect(await punches(company.id)).toHaveLength(2);
-    },
-  );
+  it('saves punches the machine sent without a record number', async () => {
+    const { company, admin } = await setup();
+    fakeDevice.attendances = [
+      { deviceUserId: '7', recordTime: new Date('2026-10-20T07:00:00Z') },
+      { deviceUserId: '8', recordTime: new Date('2026-10-20T07:05:00Z') },
+    ];
+    await admin.post('/attendance/sync');
+    expect(await punches(company.id)).toHaveLength(2);
+  });
 });
 
 describe('one clocking machine for every company (DEVICE_IP)', () => {
   // BUG-501: every company reads the same machine (DEVICE_IP): company B's sync
   // copies company A's employees' punches into company B
-  it.failing(
-    'a company’s sync never brings in punches from another company’s machine',
-    async () => {
-      const a = await setup();
-      const b = await setup();
-      fakeDevice.attendances = [devicePunch(1, '7', '2026-10-20T07:00:00Z')];
-      await a.admin.post('/attendance/sync');
-      await b.admin.post('/attendance/sync');
+  it('a company’s sync never brings in punches from another company’s machine', async () => {
+    const a = await setup();
+    const b = await setup(false);
+    fakeDevice.attendances = [devicePunch(1, '7', '2026-10-20T07:00:00Z')];
+    await a.admin.post('/attendance/sync');
+    await b.admin.post('/attendance/sync');
 
-      expect(await punches(a.company.id)).toHaveLength(1);
-      expect(await punches(b.company.id)).toEqual([]);
-    },
-  );
+    expect(await punches(a.company.id)).toHaveLength(1);
+    expect(await punches(b.company.id)).toEqual([]);
+  });
 
   // BUG-501 (same cause): any company reads the machine's user list and punches
-  it.failing(
-    'a company can’t read the user list and punches of another company’s machine',
-    async () => {
-      await setup(); // company A, owner of the machine at DEVICE_IP
-      const b = await setup();
-      fakeDevice.users = [{ uid: 1, userId: '7', name: 'Employee of A' }];
-      fakeDevice.attendances = [devicePunch(1, '7', '2026-10-20T07:00:00Z')];
+  it('a company can’t read the user list and punches of another company’s machine', async () => {
+    await setup(); // company A, owner of the machine at DEVICE_IP
+    const b = await setup(false);
+    fakeDevice.users = [{ uid: 1, userId: '7', name: 'Employee of A' }];
+    fakeDevice.attendances = [devicePunch(1, '7', '2026-10-20T07:00:00Z')];
 
-      const users = await b.admin.get('/device/users');
-      const logs = await b.admin.get('/device/logs');
-      expect(users.body.data ?? []).toEqual([]);
-      expect(logs.body.data ?? []).toEqual([]);
-    },
-  );
+    const users = await b.admin.get('/device/users');
+    const logs = await b.admin.get('/device/logs');
+    expect(users.body.data ?? []).toEqual([]);
+    expect(logs.body.data ?? []).toEqual([]);
+  });
+
+  it('refuses a company with no machine, and doesn’t show it the owner’s address', async () => {
+    await setup();
+    const b = await setup(false);
+    const message = 'No clocking machine is set up for this company';
+    expect((await b.admin.post('/attendance/sync')).body).toEqual({
+      status: 'error',
+      message,
+    });
+    expect((await b.admin.get('/device/ping')).body).toEqual({
+      status: 'error',
+      message,
+    });
+    expect((await b.admin.get('/device/status')).body).toEqual({
+      connected: false,
+      name: 'Face Recognition Machine',
+    });
+    expect(fakeDevice.created).toEqual([]);
+  });
+
+  it('reaches nobody when no company owns DEVICE_IP', async () => {
+    const { admin } = await setup();
+    delete process.env.DEVICE_COMPANY_ID;
+    expect((await admin.get('/device/ping')).body.status).toBe('error');
+    expect(fakeDevice.created).toEqual([]);
+  });
+
+  it('connects to the address saved on the company', async () => {
+    const withMachine = async (serial: string, ip: string) => {
+      const company = await seed.company({
+        devices: [{ serial: 'no-address' + serial }, { serial, ip }] as any,
+      });
+      return loginAs(t, await seed.user('admin', company.id));
+    };
+    const a = await withMachine('A1', '192.0.2.21');
+    const b = await withMachine('B1', '192.0.2.22');
+
+    await Promise.all([
+      a.get('/device/ping'),
+      b.get('/device/users'),
+      a.get('/device/logs'),
+    ]);
+    expect(fakeDevice.created.map(([ip]) => ip).sort()).toEqual([
+      '192.0.2.21',
+      '192.0.2.21',
+      '192.0.2.22',
+    ]);
+    expect((await b.get('/device/status')).body.ip).toBe('192.0.2.22');
+  });
 });
 
 describe('/device/*', () => {
@@ -438,7 +528,7 @@ describe('GET /attendance/device-logs', () => {
 
   // BUG-503: days are cut at UTC midnight, but the company is in UTC+1, so a
   // punch at 00:30 in Algeria is listed on the day before
-  it.failing('lists a punch at 00:30 in Algeria under that day', async () => {
+  it('lists a punch at 00:30 in Algeria under that day', async () => {
     const { admin } = await setup();
     await admin.post('/attendance/device-logs').send({
       deviceUserId: '7',
@@ -446,6 +536,40 @@ describe('GET /attendance/device-logs', () => {
     });
     const res = await admin.get(
       '/attendance/device-logs?from=2026-10-20&to=2026-10-20',
+    );
+    expect(res.body.count).toBe(1);
+  });
+
+  it('cuts days at the company’s own midnight', async () => {
+    const { admin } = await setup();
+    const west = await seed.company({ settings: { utcOffset: '-03:00' } });
+    const company = await loginAs(t, await seed.user('admin', west.id));
+    for (const client of [admin, company]) {
+      await client.post('/attendance/device-logs').send({
+        deviceUserId: '7',
+        timestamp: '2026-10-20T23:30:00Z',
+      });
+    }
+    const on = async (client: typeof admin, day: string) =>
+      (await client.get(`/attendance/device-logs?from=${day}&to=${day}`)).body
+        .count;
+
+    // 21 Oct 00:30 in Algeria, 20 Oct 20:30 at UTC-3
+    expect(await on(admin, '2026-10-21')).toBe(1);
+    expect(await on(admin, '2026-10-20')).toBe(0);
+    expect(await on(company, '2026-10-20')).toBe(1);
+    expect(await on(company, '2026-10-21')).toBe(0);
+  });
+
+  it('uses Algeria’s clock when the company’s offset can’t be read', async () => {
+    const bad = await seed.company({ settings: { utcOffset: 'nonsense' } });
+    const admin = await loginAs(t, await seed.user('admin', bad.id));
+    await admin.post('/attendance/device-logs').send({
+      deviceUserId: '7',
+      timestamp: '2026-10-20T23:30:00Z',
+    });
+    const res = await admin.get(
+      '/attendance/device-logs?from=2026-10-21&to=2026-10-21',
     );
     expect(res.body.count).toBe(1);
   });

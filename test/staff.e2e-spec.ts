@@ -201,7 +201,7 @@ describe('employees', () => {
     });
 
     // BUG-203: a manager can raise their own salary
-    it.failing("can't change their own salary", async () => {
+    it("can't change their own salary", async () => {
       const { me, meEmp } = await withManagers();
       const res = await me
         .put(`/employees/${meEmp._id}`)

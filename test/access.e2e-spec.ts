@@ -115,10 +115,7 @@ describe('a super admin who has not picked a company', () => {
 // body and ids that match nothing: a 4xx at worst, never a crash.
 // (/auth routes are left out: logout would end the session used here.)
 describe('an allowed caller with an empty request', () => {
-  // Known crashes, each with its own failing test below
-  const CRASHES = ['POST /planning/copy-month'];
-  const allowed = (r: RouteInfo) =>
-    !r.path.startsWith('/auth/') && !CRASHES.includes(r.key);
+  const allowed = (r: RouteInfo) => !r.path.startsWith('/auth/');
 
   it.each(
     each(
@@ -128,12 +125,6 @@ describe('an allowed caller with an empty request', () => {
     const res = await call(as.admin, r);
     expect([401, 403]).not.toContain(res.status);
     expect(res.status).toBeLessThan(500);
-  });
-
-  // BUG-301: copying a month without the months crashes (500) instead of a 400
-  it.failing('POST /planning/copy-month as admin', async () => {
-    const res = await as.admin.post('/planning/copy-month').send({});
-    expect(res.status).toBe(400);
   });
 
   it.each(each((r) => allowed(r) && r.roles.includes('superadmin')))(

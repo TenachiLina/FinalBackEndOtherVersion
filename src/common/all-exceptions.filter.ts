@@ -68,7 +68,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const res = http.getResponse<Response>();
     if (res.headersSent) return;
     const request = http.getRequest();
-    const { status, message, code, usageCount } = this.translate(exception);
+    const { status, message, code, usageCount } =
+      AllExceptionsFilter.translate(exception);
     // A code the user can pass on, to find this exact error in the log
     const reference = status >= 500 ? newReference() : undefined;
     this.record(exception, request, status, message, reference);
@@ -101,6 +102,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
     message: string | string[],
     reference?: string,
   ) {
+    if (status >= 500 && !(exception instanceof HttpException)) {
+      this.logger.error(
+        exception instanceof Error
+          ? (exception.stack ?? exception.message)
+          : JSON.stringify(exception),
+      );
+    }
     if (!request) return;
     if (status === 401 || (status === 404 && !request.route)) return;
     const user = request.user;
@@ -133,7 +141,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
     });
   }
 
-  private translate(e: any): {
+  /** What the user is told about an error. The activity log says the same. */
+  static translate(e: any): {
     status: number;
     message: string | string[];
     code?: string;
@@ -214,9 +223,6 @@ export class AllExceptionsFilter implements ExceptionFilter {
       return { status: 413, message: 'The data sent is too large' };
     }
 
-    this.logger.error(
-      e instanceof Error ? (e.stack ?? e.message) : JSON.stringify(e),
-    );
     return {
       status: 500,
       message: 'Something went wrong on our side. Please try again.',

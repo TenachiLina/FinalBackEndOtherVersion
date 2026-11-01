@@ -109,7 +109,7 @@ describe('AuditChanges', () => {
     beforeEach(() => {
       worktime[0] = {
         ...worktime[0],
-        clock_out: '00:00',
+        clock_out: null,
         overtime_minutes: '0',
       };
     });
@@ -532,31 +532,49 @@ describe('AuditChanges: other records', () => {
   });
 
   // BUG-003: a clock-out at exactly midnight is logged as "Clock-out time: Changed"
-  it.failing(
-    'logs a clock-out at exactly 00:00 (end of a night shift) as a clock-out',
-    async () => {
-      rows.Worktime = [
-        {
-          _id: WT,
-          emp_id: 12,
-          work_date: new Date('2026-10-20T00:00:00Z'),
-          clock_in: '16:00',
-          clock_out: '',
-        },
-      ];
-      const summary = await update(
-        'worktime.update',
-        'Worktime',
-        WT,
-        { clock_out: '00:00' },
-        req({ params: { id: WT }, headers: { 'x-audit-as': 'clock' } }),
-      );
-      expect(summary).toMatchObject({
-        action: 'worktime.clockOut',
-        changes: [{ label: 'Clock-out time', after: '00:00' }],
-      });
-    },
-  );
+  it('logs a clock-out at exactly 00:00 (end of a night shift) as a clock-out', async () => {
+    rows.Worktime = [
+      {
+        _id: WT,
+        emp_id: 12,
+        work_date: new Date('2026-10-20T00:00:00Z'),
+        clock_in: '16:00',
+        clock_out: '',
+      },
+    ];
+    const summary = await update(
+      'worktime.update',
+      'Worktime',
+      WT,
+      { clock_out: '00:00' },
+      req({ params: { id: WT }, headers: { 'x-audit-as': 'clock' } }),
+    );
+    expect(summary).toMatchObject({
+      action: 'worktime.clockOut',
+      changes: [{ label: 'Clock-out time', after: '00:00' }],
+    });
+  });
+
+  it('still leaves zero hours out of a new work time record', async () => {
+    rows.Worktime = [
+      {
+        _id: WT,
+        emp_id: 12,
+        work_date: new Date('2026-10-20T00:00:00Z'),
+        clock_in: '00:00',
+        work_hours: '00:00',
+      },
+    ];
+    const summary = await changes.describe(
+      'worktime.create',
+      req(),
+      { _id: WT },
+      undefined,
+    );
+    const labels = summary?.changes.map((c) => c.label);
+    expect(labels).toContain('Clock-in time');
+    expect(labels).not.toContain('Hours worked');
+  });
 
   describe('a planning day', () => {
     const day = new Date('2026-10-20');
