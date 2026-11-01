@@ -174,6 +174,38 @@ export class PlanningService {
   }
 
   
+  /** The hour an entry is listed under: its first sub-task's start, or the shift's. */
+  private startHour(item: any): string | null {
+    const start: string | undefined =
+      item.tasks?.[0]?.startTime || item.shiftId?.startTime;
+    // Example: "06:00" -> "06H"
+    return start ? `${start.split(":")[0].padStart(2, "0")}H` : null;
+  }
+
+  /**
+   * The grid of all three exports. The rows are the start hours actually
+   * planned, earliest first, so nobody can fall outside a fixed list of hours.
+   */
+  private buildGrid(
+    days: string[],
+    cells: { day: string; hour: string; text: string }[],
+  ) {
+    const hours = [...new Set(cells.map((c) => c.hour))].sort();
+    const grid: Record<string, Record<string, string[]>> = {};
+
+    days.forEach((day) => {
+      grid[day] = {};
+
+      hours.forEach((hour) => {
+        grid[day][hour] = [];
+      });
+    });
+
+    cells.forEach(({ day, hour, text }) => grid[day][hour].push(text));
+
+    return { grid, hours };
+  }
+
 private async buildFirstWeekPlanningWithBackup(
   year: number,
   month: number,
@@ -253,40 +285,10 @@ private async buildFirstWeekPlanningWithBackup(
     );
 
     // --------------------------------------------------
-    // 5. Hours
+    // 5. List main employees and backups
     // --------------------------------------------------
-    const hours = [
-      "06H",
-      "07H",
-      "08H",
-      "09H",
-      "10H",
-      "11H",
-      "12H",
-      "14H",
-      "15H",
-      "16H",
-    ];
+    const cells: { day: string; hour: string; text: string }[] = [];
 
-    // --------------------------------------------------
-    // 6. Empty grid
-    // --------------------------------------------------
-    const weekGrid: Record<
-      string,
-      Record<string, string[]>
-    > = {};
-
-    weekDays.forEach((day) => {
-      weekGrid[day] = {};
-
-      hours.forEach((hour) => {
-        weekGrid[day][hour] = [];
-      });
-    });
-
-    // --------------------------------------------------
-    // 7. Fill grid with main employees and backups
-    // --------------------------------------------------
     planning.forEach((item: any) => {
       // Ignore records without a main employee or shift
       if (!item.empId || !item.shiftId) {
@@ -309,15 +311,7 @@ private async buildFirstWeekPlanningWithBackup(
 
       const day = weekDays[index];
 
-      let startTime: string;
-
-      if (item.tasks?.length) {
-        startTime = item.tasks[0].startTime;
-      } else {
-        startTime = item.shiftId.startTime;
-      }
-
-      const hour = `${startTime.substring(0, 2)}H`;
+      const hour = this.startHour(item)!;
 
       // Main employee
       const mainEmployee =
@@ -336,28 +330,22 @@ private async buildFirstWeekPlanningWithBackup(
           : ["Backup: No backup"]),
       ].join("\n");
 
-      if (weekGrid[day][hour]) {
-        weekGrid[day][hour].push(employee);
-      }
+      cells.push({ day, hour, text: employee });
     });
 
     // --------------------------------------------------
-    // 8. Remove hours with no planned employees
+    // 6. One row per start hour in use
     // --------------------------------------------------
-    const filteredHours = hours.filter((hour) =>
-      weekDays.some(
-        (day) => weekGrid[day][hour].length > 0,
-      ),
-    );
+    const { grid: weekGrid, hours } = this.buildGrid(weekDays, cells);
 
     // --------------------------------------------------
-    // 9. Return planning with filtered hours
+    // 7. Return planning
     // --------------------------------------------------
     return {
       weekGrid,
       weekDays,
       weekDates,
-      hours: filteredHours,
+      hours,
     };
   }
   //Export Week in Excel Format
@@ -1004,45 +992,10 @@ private async buildFirstWeekPlanningWithoutBackups(
     );
 
     // --------------------------------------------------
-    // 5. Hours
+    // 5. List main employees only
     // --------------------------------------------------
-    const hours = [
-      "06H",
-      "07H",
-      "08H",
-      "09H",
-      "10H",
-      "11H",
-      "12H",
-      "14H",
-      "15H",
-      "16H",
-      "17H",
-      "18H",
-      "19H",
-      "20H",
-      "21H",
-    ];
+    const cells: { day: string; hour: string; text: string }[] = [];
 
-    // --------------------------------------------------
-    // 6. Empty grid
-    // --------------------------------------------------
-    const weekGrid: Record<
-      string,
-      Record<string, string[]>
-    > = {};
-
-    weekDays.forEach((day) => {
-      weekGrid[day] = {};
-
-      hours.forEach((hour) => {
-        weekGrid[day][hour] = [];
-      });
-    });
-
-    // --------------------------------------------------
-    // 7. Fill grid - main employees only
-    // --------------------------------------------------
     planning.forEach((item: any) => {
       if (!item.empId || !item.shiftId) {
         return;
@@ -1064,42 +1017,28 @@ private async buildFirstWeekPlanningWithoutBackups(
 
       const day = weekDays[index];
 
-      let startTime: string;
-
-      if (item.tasks?.length) {
-        startTime = item.tasks[0].startTime;
-      } else {
-        startTime = item.shiftId.startTime;
-      }
-
-      const hour = `${startTime.substring(0, 2)}H`;
+      const hour = this.startHour(item)!;
 
       // Only the main employee's name is added.
       const employee =
         `${item.empId.firstName} ${item.empId.lastName}`;
 
-      if (weekGrid[day][hour]) {
-        weekGrid[day][hour].push(employee);
-      }
+      cells.push({ day, hour, text: employee });
     });
 
     // --------------------------------------------------
-    // 8. Remove hours with no planned employees
+    // 6. One row per start hour in use
     // --------------------------------------------------
-    const filteredHours = hours.filter((hour) =>
-      weekDays.some(
-        (day) => weekGrid[day][hour].length > 0,
-      ),
-    );
+    const { grid: weekGrid, hours } = this.buildGrid(weekDays, cells);
 
     // --------------------------------------------------
-    // 9. Return planning with filtered hours
+    // 7. Return planning
     // --------------------------------------------------
     return {
       weekGrid,
       weekDays,
       weekDates,
-      hours: filteredHours,
+      hours,
     };
 }
   //Export Week in Excel Format
@@ -1736,62 +1675,20 @@ private async buildDayPlanning(
     });
 
     // --------------------------------------------------
-    // 4. Hours
+    // 4. List main employees and backups
     // --------------------------------------------------
-    const hours = [
-      "06H",
-      "07H",
-      "08H",
-      "09H",
-      "10H",
-      "11H",
-      "12H",
-      "14H",
-      "15H",
-      "16H",
-      "17H",
-      "18H",
-      "19H",
-      "20H",
-      "21H",
-    ];
+    const cells: { day: string; hour: string; text: string }[] = [];
 
-    // --------------------------------------------------
-    // 5. Empty grid
-    // --------------------------------------------------
-    const dayGrid: Record<
-      string,
-      Record<string, string[]>
-    > = {};
-
-    dayGrid[dayName] = {};
-
-    hours.forEach((hour) => {
-      dayGrid[dayName][hour] = [];
-    });
-
-    // --------------------------------------------------
-    // 6. Fill grid with main employees and backups
-    // --------------------------------------------------
     planning.forEach((item: any) => {
       if (!item.empId) {
         return;
       }
 
-      let startTime: string;
+      const hour = this.startHour(item);
 
-      // Use task start time first
-      if (item.tasks?.length) {
-        startTime = item.tasks[0].startTime;
-      } else if (item.shiftId) {
-        // Otherwise use shift start time
-        startTime = item.shiftId.startTime;
-      } else {
+      if (!hour) {
         return;
       }
-
-      // Example: "06:00" -> "06H"
-      const hour = `${startTime.substring(0, 2)}H`;
 
       // Main employee
       const mainEmployee =
@@ -1810,27 +1707,22 @@ private async buildDayPlanning(
           : ["Backup: No backup"]),
       ].join("\n");
 
-      // Add employee to grid
-      if (dayGrid[dayName][hour]) {
-        dayGrid[dayName][hour].push(employee);
-      }
+      cells.push({ day: dayName, hour, text: employee });
     });
 
     // --------------------------------------------------
-    // 7. Remove hours with no planned employees
+    // 5. One row per start hour in use
     // --------------------------------------------------
-    const filteredHours = hours.filter(
-      (hour) => dayGrid[dayName][hour].length > 0,
-    );
+    const { grid: dayGrid, hours } = this.buildGrid([dayName], cells);
 
     // --------------------------------------------------
-    // 8. Return planning with filtered hours
+    // 6. Return planning
     // --------------------------------------------------
     return {
       dayGrid,
       dayName,
       date,
-      hours: filteredHours,
+      hours,
     };
   }
   //Export Day in Excel Format
