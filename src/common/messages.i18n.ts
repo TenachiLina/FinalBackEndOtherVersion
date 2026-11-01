@@ -193,6 +193,7 @@ const EXACT: Record<string, Tr> = {
     ar: 'التاريخ والوقت غير صالحين',
   },
   'Shift not found': { fr: 'Créneau introuvable', ar: 'الفترة غير موجودة' },
+  'Task not found': { fr: 'Poste introuvable', ar: 'المنصب غير موجود' },
   'Bonus not found': { fr: 'Prime introuvable', ar: 'المكافأة غير موجودة' },
   'amount must be greater than 0': {
     fr: 'Le montant doit être supérieur à 0',
