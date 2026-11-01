@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Planning, PlanningDocument } from './planning.shema';
@@ -6,6 +6,8 @@ import * as ExcelJS from "exceljs";
 import { Response } from "express";
 import { getBackupIds, getBackupEmployees } from './backups.util';
 import { currentCompanyId } from '../tenancy/tenant-context';
+
+const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 @Injectable()
 export class PlanningService {
@@ -87,6 +89,16 @@ export class PlanningService {
    * after the other. The same employee twice in one cell is also kept only once.
    */
   async bulkSave(entries: any[], planDate: string): Promise<PlanningDocument[]> {
+    // Checked first: replaceDay deletes the day before it reads the entries
+    if (
+      !planDate ||
+      Number.isNaN(new Date(planDate).getTime()) ||
+      !Array.isArray(entries) ||
+      !entries.every((e) => e && typeof e === 'object')
+    ) {
+      throw new BadRequestException('The data sent was not valid');
+    }
+
     const key = `${currentCompanyId()}:${planDate}`;
     const previous = this.daySaves.get(key) ?? Promise.resolve();
     // .then keeps the request's tenant context, so the tenant plugin still scopes the queries
@@ -2173,6 +2185,16 @@ private async buildDayPlanning(
       sourceMonth: string,
       destinationMonth: string,
     ) {
+      if (
+        ![sourceMonth, destinationMonth].every(
+          (month) => typeof month === 'string' && MONTH.test(month),
+        )
+      ) {
+        throw new BadRequestException(
+          'Choose the month to copy and the month to copy to',
+        );
+      }
+
       const [sourceYear, sourceMonthNumber] =
         sourceMonth.split("-").map(Number);
 
