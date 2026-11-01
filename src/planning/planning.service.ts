@@ -2218,6 +2218,8 @@ private async buildDayPlanning(
             $lte: sourceEnd,
           },
         })
+        // Earliest day first: "the first Tuesday" is not the one saved first
+        .sort({ planDate: 1, _id: 1 })
         .lean();
 
       if (sourcePlanning.length === 0) {
