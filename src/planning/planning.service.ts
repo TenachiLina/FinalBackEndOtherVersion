@@ -145,7 +145,10 @@ export class PlanningService {
       .populate('shiftId')
       .lean();
 
-    return planning.map((item: any) => ({
+    // An employee or shift deleted since is left out, as in the exports
+    const usable = planning.filter((item: any) => item.empId && item.shiftId);
+
+    return usable.map((item: any) => ({
       id: item._id,
       // Main employee
       empId: item.empId._id,
