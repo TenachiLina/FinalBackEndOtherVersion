@@ -267,6 +267,14 @@ const FIELDS: Record<string, Tr> = {
     fr: "part d'avance hebdomadaire",
     ar: 'نسبة التسبيق الأسبوعي',
   },
+  'Only an admin can change your salary': {
+    fr: "Seul un administrateur peut modifier votre salaire",
+    ar: 'يمكن للمدير فقط تعديل راتبك',
+  },
+  "You can't delete your own employee record": {
+    fr: 'Vous ne pouvez pas supprimer votre propre fiche employé',
+    ar: 'لا يمكنك حذف سجل الموظف الخاص بك',
+  },
 };
 
 function field(name: string, lang: Exclude<ApiLang, 'en'>): string {
