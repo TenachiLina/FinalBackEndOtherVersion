@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { AuditLog, AuditLogDocument } from './audit-log.schema';
 import { User, UserDocument } from '../auth/user.schema';
+import { CompaniesService } from '../companies/companies.service';
 
 export type AuditEntry = Omit<
   AuditLog,
@@ -38,7 +39,16 @@ export class AuditService {
     private readonly auditModel: Model<AuditLogDocument>,
     @InjectModel(User.name)
     private readonly userModel: Model<UserDocument>,
+    private readonly companiesService: CompaniesService,
   ) {}
+
+  // The company's clock, as in "+01:00"; UTC for the super admin's log of every company
+  private async utcOffset(companyId: string | null) {
+    if (!companyId) return 'Z';
+    const company = await this.companiesService.findById(companyId);
+    const offset = company?.settings?.utcOffset ?? '';
+    return /^[+-]\d{2}:\d{2}$/.test(offset) ? offset : '+01:00';
+  }
 
   /** Never throws: a failed log write must not break the user's action. */
   async record(entry: AuditEntry) {
@@ -74,8 +84,12 @@ export class AuditService {
     if (companyId) filter.companyId = new Types.ObjectId(companyId);
 
     const created: Record<string, Date> = {};
-    if (query.from) created.$gte = new Date(`${query.from}T00:00:00.000Z`);
-    if (query.to) created.$lte = new Date(`${query.to}T23:59:59.999Z`);
+    // Days are the company's days, not UTC ones: at 00:30 in Algeria, UTC is
+    // still on the day before.
+    const offset =
+      query.from || query.to ? await this.utcOffset(companyId) : 'Z';
+    if (query.from) created.$gte = new Date(`${query.from}T00:00:00.000${offset}`);
+    if (query.to) created.$lte = new Date(`${query.to}T23:59:59.999${offset}`);
     if (Object.keys(created).length) filter.createdAt = created;
 
     const userId = toId(query.userId ?? null);

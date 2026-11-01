@@ -12,6 +12,7 @@ import { AuditService } from './audit.service';
 import type { AuditEntry } from './audit.service';
 import { actionFor, describeTarget, SKIP_AUDIT_KEY } from './audit-actions';
 import { sanitize } from '../common/sanitize';
+import { AllExceptionsFilter } from '../common/all-exceptions.filter';
 import { clientInfo } from '../auth/client-info';
 import { AuditChanges } from './audit-changes';
 import type { Snapshot } from './audit-changes';
@@ -101,13 +102,20 @@ export class AuditInterceptor implements NestInterceptor {
                 });
             },
             error: (err) => {
+              // What the user saw, not the database's own text. For a real
+              // crash the user saw a generic message, so keep the real one.
+              const { status, message } = AllExceptionsFilter.translate(err);
+              const crashed = status >= 500 && !(err instanceof HttpException);
               const entry = {
                 ...base,
                 target: describeTarget(request.body, null),
                 success: false,
-                statusCode:
-                  err instanceof HttpException ? err.getStatus() : 500,
-                error: err instanceof Error ? err.message : String(err),
+                statusCode: status,
+                error: !crashed
+                  ? [message].flat().join('. ')
+                  : err instanceof Error
+                    ? err.message
+                    : String(err),
               };
               if (isLogin) {
                 void this.writeFailedLogin(entry, request.body?.email);
