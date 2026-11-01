@@ -2230,45 +2230,6 @@ private async buildDayPlanning(
       }
 
       // ==================================================
-      // DESTINATION MONTH RANGE
-      // ==================================================
-
-      const destinationStart = new Date(
-        Date.UTC(
-          destinationYear,
-          destinationMonthNumber - 1,
-          1,
-          0,
-          0,
-          0,
-          0,
-        ),
-      );
-
-      const destinationEnd = new Date(
-        Date.UTC(
-          destinationYear,
-          destinationMonthNumber,
-          0,
-          23,
-          59,
-          59,
-          999,
-        ),
-      );
-
-      // ==================================================
-      // REMOVE EXISTING DESTINATION PLANNING
-      // ==================================================
-
-      await this.planningModel.deleteMany({
-        planDate: {
-          $gte: destinationStart,
-          $lte: destinationEnd,
-        },
-      });
-
-      // ==================================================
       // GROUP SOURCE PLANNING BY EXACT DATE
       // ==================================================
 
@@ -2398,6 +2359,8 @@ private async buildDayPlanning(
 
       const copiedPlanning: any[] = [];
 
+      const copiedDays: Date[] = [];
+
       for (
         let day = 1;
         day <= lastDayOfDestinationMonth;
@@ -2458,6 +2421,8 @@ private async buildDayPlanning(
           continue;
         }
 
+        copiedDays.push(destinationDate);
+
         // ==================================================
         // COPY EACH PLANNING RECORD
         // ==================================================
@@ -2493,6 +2458,24 @@ private async buildDayPlanning(
           });
         }
       }
+
+      // ==================================================
+      // REMOVE WHAT THE COPIED DAYS HAD
+      // ==================================================
+
+      /*
+        Only the days that receive a copy: the other
+        weekdays of the destination month keep their planning.
+      */
+
+      await this.planningModel.deleteMany({
+        $or: copiedDays.map((day) => ({
+          planDate: {
+            $gte: day,
+            $lte: new Date(day.getTime() + 24 * 60 * 60 * 1000 - 1),
+          },
+        })),
+      });
 
       // ==================================================
       // SAVE NEW PLANNING
