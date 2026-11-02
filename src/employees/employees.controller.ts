@@ -16,9 +16,16 @@ import type { AuthUser } from '../auth/auth.decorators';
 // Other managers stay listed (planning and clock-in need them), without their
 // salary or contact details, and flagged so salary pages can leave them out.
 function withoutPrivateFields(employee: any) {
-  const { baseSalary, address, phoneNumber, ...rest } = employee.toObject
-    ? employee.toObject()
-    : employee;
+  const {
+    baseSalary,
+    address,
+    phoneNumber,
+    familyStatus,
+    birthDate,
+    hireDate,
+    socialSecurityNumber,
+    ...rest
+  } = employee.toObject ? employee.toObject() : employee;
   return { ...rest, otherManager: true };
 }
 
