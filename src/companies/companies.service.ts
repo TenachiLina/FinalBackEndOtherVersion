@@ -88,6 +88,7 @@ export class CompaniesService {
     if (!name) throw new BadRequestException('Company name is required');
     const company = new this.companyModel({ name });
     this.apply(company, { ...input, name });
+    await this.ensureSlug(company, input);
     return this.save(company);
   }
 
@@ -95,6 +96,7 @@ export class CompaniesService {
   async update(id: string, input: CompanyInput): Promise<CompanyDocument> {
     const company = await this.getById(id);
     this.apply(company, input);
+    await this.ensureSlug(company, input);
     return this.save(company);
   }
 
@@ -146,9 +148,7 @@ export class CompaniesService {
         );
       }
       company.slug = slug;
-    } else if (!company.slug) {
-      company.slug = slugify(company.name) || undefined;
-    }
+    } 
     if (input.branding !== undefined) {
       company.branding = this.validateBranding({
         ...this.plain(company.branding),
@@ -170,6 +170,19 @@ export class CompaniesService {
       }
       company.devices = devices;
     }
+  }
+
+  /** When no link name was typed, builds one from the name: pizza-roma, pizza-roma-2, ... */
+  private async ensureSlug(company: CompanyDocument, input: CompanyInput) {
+    if (input.slug !== undefined || company.slug) return;
+    const base = slugify(company.name);
+    if (!base) return;
+    let slug = base;
+    for (let n = 2; await this.companyModel.exists({ slug, _id: { $ne: company._id } }); n++) {
+      const suffix = `-${n}`;
+      slug = base.slice(0, 50 - suffix.length) + suffix;
+    }
+    company.slug = slug;
   }
 
   private plain<T>(value: T | undefined): T {
@@ -211,9 +224,9 @@ export class CompaniesService {
   }
 
   private validateSettings(s: CompanySettings): CompanySettings {
-    const positive = (v: unknown, field: string, max: number) => {
+    const positive = (v: unknown, field: string, max: number, allowZero = false) => {
       const n = Number(v);
-      if (!Number.isFinite(n) || n <= 0 || n > max) {
+      if (!Number.isFinite(n) || n < 0 || (n === 0 && !allowZero) || n > max) {
         throw new BadRequestException(`${field} must be between 0 and ${max}`);
       }
       return n;
@@ -243,6 +256,7 @@ export class CompaniesService {
         s.weeklyAdvanceRatio,
         'Weekly advance ratio',
         1,
+        true,
       ),
     };
   }

@@ -32,8 +32,9 @@ const users = [
   { _id: me, role: 'manager', employeeId: myEmployee._id },
   { _id: other, role: 'manager', employeeId: otherEmployee._id },
 ];
-const userModel = fakeModel(users, (u, f) =>
-  u.role === f.role && String(u._id) !== String(f._id.$ne),
+const userModel = fakeModel(
+  users,
+  (u, f) => u.role === f.role && String(u._id) !== String(f._id.$ne),
 );
 const employeeModel = fakeModel([myEmployee, otherEmployee], (e, f) =>
   f._id.$in.some((id: Types.ObjectId) => String(id) === String(e._id)),

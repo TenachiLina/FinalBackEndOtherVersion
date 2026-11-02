@@ -60,18 +60,31 @@ export class EmployeesController {
     return employee;
   }
   @Roles('admin', 'manager') @Put(':id') async update(
-    @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
-    @Body() body: any,
+  @CurrentUser() user: AuthUser,
+  @Param('id') id: string,
+  @Body() body: any,
   ) {
     await this.assertCanChange(user, id);
+
+    if (body?.baseSalary !== undefined && (await this.visibility.isOwnRecord(user, id))) {
+      const current: any = await this.employeesService.findOne(id);
+      if (current && Number(body.baseSalary) !== Number(current.baseSalary)) {
+        throw new ForbiddenException('Only an admin can change your salary');
+      }
+    }
+
     return this.employeesService.update(id, body);
   }
   @Roles('admin', 'manager') @Delete(':id') async remove(
-    @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
+  @CurrentUser() user: AuthUser,
+  @Param('id') id: string,
   ) {
     await this.assertCanChange(user, id);
+
+    if (await this.visibility.isOwnRecord(user, id)) {
+      throw new ForbiddenException("You can't delete your own employee record");
+    }
+
     return this.employeesService.remove(id);
   }
 }

@@ -2,19 +2,19 @@
 export function describeDevice(userAgent: string | undefined): string {
   if (!userAgent) return 'Unknown device';
   const ua = userAgent;
-  const browser = /Edg\//.test(ua)
+  const browser = /Edg(A|iOS)?\//.test(ua)
     ? 'Edge'
     : /OPR\/|Opera/.test(ua)
       ? 'Opera'
-      : /Firefox\//.test(ua)
+      : /Firefox\/|FxiOS\//.test(ua)
         ? 'Firefox'
-        : /Chrome\//.test(ua)
+        : /Chrome\/|CriOS\//.test(ua)
           ? 'Chrome'
           : /Safari\//.test(ua)
             ? 'Safari'
             : /curl|PostmanRuntime|insomnia/i.test(ua)
               ? 'API client'
-              : 'Browser';
+              : 'Browser';            
   const os = /Windows/.test(ua)
     ? 'Windows'
     : /Android/.test(ua)

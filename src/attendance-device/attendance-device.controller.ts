@@ -11,8 +11,7 @@ export class AttendanceDeviceController {
   @Get('ping')
   async ping() {
     try {
-      await this.deviceService.connect();
-      await this.deviceService.disconnect();
+      await this.deviceService.disconnect(await this.deviceService.connect());
       return { status: 'success', message: 'Device connected successfully' };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

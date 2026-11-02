@@ -4,17 +4,14 @@
  */
 import { Test } from '@nestjs/testing';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { getModelToken } from '@nestjs/mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
+import { getConnectionToken, getModelToken } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 import { createHmac } from 'crypto';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const request = require('supertest');
 
 const JWT_SECRET = 'test-secret-'.padEnd(64, 'x');
 const PASSWORD = 'Str0ng-pass-1';
 
-let mongo: MongoMemoryServer;
 let app: NestExpressApplication;
 let sessionModel: Model<any>;
 let userModel: Model<any>;
@@ -51,16 +48,15 @@ const decode = (jwt: string) =>
   JSON.parse(Buffer.from(jwt.split('.')[1], 'base64url').toString());
 
 beforeAll(async () => {
-  mongo = await MongoMemoryServer.create();
   Object.assign(process.env, {
-    MONGODB_URI: mongo.getUri('security_test'),
+    // Its own database in the MongoDB shared by the test run (global-setup.ts)
+    MONGODB_URI: `${process.env.MONGO_TEST_URI!.replace(/\/?$/, '/')}security_${Date.now()}`,
     JWT_SECRET,
     FORCE_HTTPS: 'true',
     TRUST_PROXY: 'loopback',
     ACCESS_TOKEN_TTL: '15m',
   });
   // Loaded after the environment is set: modules read it when loaded.
-  /* eslint-disable @typescript-eslint/no-require-imports */
   const { AppModule } = require('../src/app.module');
   const { configureApp } = require('../src/app.setup');
   const moduleRef = await Test.createTestingModule({
@@ -116,8 +112,8 @@ beforeAll(async () => {
 }, 120_000);
 
 afterAll(async () => {
+  await app?.get(getConnectionToken()).dropDatabase();
   await app?.close();
-  await mongo?.stop();
 });
 
 describe('Password hashing', () => {

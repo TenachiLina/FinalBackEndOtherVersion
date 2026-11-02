@@ -36,6 +36,8 @@ export class CompanyDevice {
   // Serial number the ZKTeco machine sends as ?SN=...
   @Prop({ required: true, trim: true }) serial!: string;
   @Prop({ trim: true }) name?: string;
+  // Address the server reaches the machine at, for Sync and /device/*
+  @Prop({ trim: true }) ip?: string;
 }
 export const CompanyDeviceSchema = SchemaFactory.createForClass(CompanyDevice);
 

@@ -2,9 +2,11 @@
 import { Module } from '@nestjs/common';
 import { AttendanceDeviceService } from './attendance-device.service';
 import { AttendanceDeviceController } from './attendance-device.controller';
+import { CompaniesModule } from '../companies/companies.module';
 
 @Module({
-  controllers: [AttendanceDeviceController], 
+  imports: [CompaniesModule],
+  controllers: [AttendanceDeviceController],
   providers: [AttendanceDeviceService],
   exports: [AttendanceDeviceService],
 })

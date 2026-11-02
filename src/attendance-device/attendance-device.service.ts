@@ -1,26 +1,52 @@
 // src/attendance-device/attendance-device.service.ts
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import ZKLib from 'node-zklib';
+import { CompaniesService } from '../companies/companies.service';
+import { currentCompanyId } from '../tenancy/tenant-context';
 
 @Injectable()
 export class AttendanceDeviceService {
   private readonly logger = new Logger(AttendanceDeviceService.name);
-  private zkInstance: any;
 
+  constructor(private readonly companiesService: CompaniesService) {}
+
+  // The current company's machine: the address saved on the company, or
+  // DEVICE_IP for the one company named by DEVICE_COMPANY_ID, until its address
+  // is saved too. No other company may reach it; with neither, nobody can.
+  private async machineIp() {
+    const companyId = currentCompanyId();
+    if (!companyId) return undefined;
+    const company = await this.companiesService.findById(companyId);
+    const own = company?.devices?.find((device) => device.ip)?.ip;
+    if (own) return own;
+    return companyId === process.env.DEVICE_COMPANY_ID
+      ? process.env.DEVICE_IP
+      : undefined;
+  }
+
+  // Each caller keeps its own connection: on a field shared by all requests,
+  // two companies syncing at once would read each other's machine.
  async connect() {
-  this.zkInstance = new ZKLib(
-    process.env.DEVICE_IP,
+  const ip = await this.machineIp();
+  if (!ip) {
+    throw new BadRequestException(
+      'No clocking machine is set up for this company',
+    );
+  }
+
+  const zkInstance = new ZKLib(
+    ip,
     4370,
     10000,
     4000,
   );
 
   try {
-    await this.zkInstance.createSocket();
+    await zkInstance.createSocket();
 
     this.setConnectionState(true);
 
-    return true;
+    return zkInstance;
   } catch (err) {
     // Don't print connection failures every time we check status
     this.setConnectionState(false);
@@ -30,25 +56,24 @@ export class AttendanceDeviceService {
   }
 }
 
-  async disconnect() {
-    if (this.zkInstance) await this.zkInstance.disconnect();
+  async disconnect(zkInstance: any) {
+    await zkInstance.disconnect();
   }
 
-  //Pulls the users' list exists in the device 
+  //Pulls the users' list exists in the device
   async getDeviceUsers() {
-  await this.connect();
-  const users = await this.zkInstance.getUsers();
-  await this.disconnect();
+  const zkInstance = await this.connect();
+  const users = await zkInstance.getUsers();
+  await this.disconnect(zkInstance);
   return users.data; // array of { uid, userId, name, ... }
   }
 
 
   async getDeviceStatus() {
-  const ip = process.env.DEVICE_IP;
+  const ip = await this.machineIp();
 
   try {
-    await this.connect();
-    await this.disconnect();
+    await this.disconnect(await this.connect());
 
     return {
       connected: true,
@@ -79,9 +104,9 @@ private setConnectionState(connected: boolean) {
 }
   //Attendance logs.
   async getAttendanceLogs() {
-  await this.connect();
-  const logs = await this.zkInstance.getAttendances();
-  await this.disconnect();
+  const zkInstance = await this.connect();
+  const logs = await zkInstance.getAttendances();
+  await this.disconnect(zkInstance);
   return logs.data; // array of { userId, timestamp, ... }
   }
 }

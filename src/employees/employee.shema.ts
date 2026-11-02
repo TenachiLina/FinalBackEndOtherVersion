@@ -10,7 +10,7 @@ export class Employee {
   @Prop() address!: string;
   @Prop() phoneNumber!: string;
   @Prop({ required: true, default: 0 }) baseSalary!: number;
-  @Prop() empNumber!: number;
+  @Prop({ required: true, min: 1 }) empNumber!: number;
   @Prop({ required: true }) firstName!: string;
   @Prop({ required: true }) lastName!: string;
 }

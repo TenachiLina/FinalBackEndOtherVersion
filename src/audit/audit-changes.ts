@@ -73,6 +73,9 @@ const isBlank = (v: unknown) =>
   v === '00:00' ||
   (Array.isArray(v) && v.length === 0);
 
+// Clock times are only blank when empty: "00:00" is a real midnight
+const isNoTime = (v: unknown) => v === undefined || v === null || v === '';
+
 const idOf = (v: any): string | undefined =>
   v == null ? undefined : String(v._id ?? v);
 
@@ -165,8 +168,7 @@ class Lookups {
 // ── Formatters ──────────────────────────────────────────────────────────────
 
 const yesNo: Fmt = (v) => (v ? 'Yes' : 'No');
-// "00:00" is how the app stores "not clocked yet"
-const clockTime: Fmt = (v) => (!v || v === '00:00' ? '' : String(v));
+const clockTime: Fmt = (v) => (v ? String(v) : '');
 const date: Fmt = (v, lk) => lk.date(v);
 const dateTime: Fmt = (v, lk) => lk.dateTime(v);
 const empById: Fmt = (v, lk) => lk.employeeById(v);
@@ -442,14 +444,14 @@ export class AuditChanges {
     const said = String(req.headers?.['x-audit-as'] ?? '').toLowerCase();
     if (said === 'edit') return null;
 
-    const inChanged = old?.clock_in !== after.clock_in && !isBlank(after.clock_in);
-    const outChanged = old?.clock_out !== after.clock_out && !isBlank(after.clock_out);
+    const inChanged = old?.clock_in !== after.clock_in && !isNoTime(after.clock_in);
+    const outChanged = old?.clock_out !== after.clock_out && !isNoTime(after.clock_out);
     if (!inChanged && !outChanged) return null;
 
     if (said !== 'clock') {
       const replacedTime =
-        (inChanged && !isBlank(old?.clock_in)) ||
-        (outChanged && !isBlank(old?.clock_out));
+        (inChanged && !isNoTime(old?.clock_in)) ||
+        (outChanged && !isNoTime(old?.clock_out));
       const keys = new Set([...Object.keys(old ?? {}), ...Object.keys(after)]);
       const otherChange = [...keys].some((k) => {
         if (CLOCK_FIELDS.has(k) || IGNORED_FIELDS.has(k)) return false;
@@ -496,9 +498,10 @@ export class AuditChanges {
     for (const [path, label, fmt = plain] of fields) {
       const b = before ? get(before, path) : undefined;
       const a = after ? get(after, path) : undefined;
+      const blank = fmt === clockTime ? isNoTime : isBlank;
       // New record: list what was filled in. Deleted record: what it held.
-      if (!before && isBlank(a)) continue;
-      if (!after && isBlank(b)) continue;
+      if (!before && blank(a)) continue;
+      if (!after && blank(b)) continue;
       if (before && after && JSON.stringify(b) === JSON.stringify(a)) continue;
 
       const fb = before ? await fmt(b, lk) : undefined;

@@ -2,12 +2,16 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Bonus } from './bonus.schema';
+import { Employee, EmployeeDocument } from '../employees/employee.shema';
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 @Injectable()
 export class BonusesService {
-  constructor(@InjectModel(Bonus.name) private readonly bonusModel: Model<Bonus>) {}
+  constructor(
+    @InjectModel(Bonus.name) private readonly bonusModel: Model<Bonus>,
+    @InjectModel(Employee.name) private readonly employeeModel: Model<EmployeeDocument>,
+  ) {}
 
   async create(body: { emp_id: number; amount: number; date: string; reason: string }) {
     const amount = Number(body.amount);
@@ -15,6 +19,7 @@ export class BonusesService {
     if (!ISO_DATE.test(String(body.date))) throw new BadRequestException('date must be YYYY-MM-DD');
     if (!body.reason || !String(body.reason).trim()) throw new BadRequestException('reason is required');
     if (body.emp_id === undefined || body.emp_id === null) throw new BadRequestException('emp_id is required');
+    if (!(await this.employeeModel.exists({ empNumber: body.emp_id }))) throw new BadRequestException('Employee not found');
 
     return this.bonusModel.create({
       emp_id: Number(body.emp_id),

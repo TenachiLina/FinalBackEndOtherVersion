@@ -1,11 +1,17 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Advance, AdvanceDocument } from './advance.schema';
+import { Employee, EmployeeDocument } from '../employees/employee.shema';
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 @Injectable()
 export class AdvancesService {
-  constructor(@InjectModel(Advance.name) private advanceModel: Model<AdvanceDocument>) {}
+  constructor(
+    @InjectModel(Advance.name) private advanceModel: Model<AdvanceDocument>,
+    @InjectModel(Employee.name) private employeeModel: Model<EmployeeDocument>,
+  ) {}
 
   /**
    * Create a new advance. Rejects (409 Conflict) if an advance already
@@ -14,6 +20,12 @@ export class AdvancesService {
    * "same week/period", preventing accidental duplicate advances.
    */
   async create(data: { emp_id: number; amount: number; date: string; reason?: string }): Promise<AdvanceDocument> {
+    const amount = Number(data.amount);
+    if (!Number.isFinite(amount) || amount <= 0) throw new BadRequestException('amount must be greater than 0');
+    if (!ISO_DATE.test(String(data.date))) throw new BadRequestException('date must be YYYY-MM-DD');
+    if (data.emp_id === undefined || data.emp_id === null) throw new BadRequestException('emp_id is required');
+    if (!(await this.employeeModel.exists({ empNumber: data.emp_id }))) throw new BadRequestException('Employee not found');
+
     const targetDate = new Date(data.date);
 
     const existing = await this.advanceModel
@@ -28,7 +40,7 @@ export class AdvancesService {
 
     return this.advanceModel.create({
       emp_id: data.emp_id,
-      amount: data.amount,
+      amount,
       date: targetDate,
       reason: data.reason,
     });

@@ -8,6 +8,8 @@ import { Model, Types } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
 
 import { AttendanceDeviceService } from '../attendance-device/attendance-device.service';
+import { CompaniesService } from '../companies/companies.service';
+import { currentCompanyId } from '../tenancy/tenant-context';
 
 import {
   Employee,
@@ -33,7 +35,20 @@ export class AttendanceService {
     private employeeModel: Model<EmployeeDocument>,
 
     private deviceService: AttendanceDeviceService,
+
+    private companiesService: CompaniesService,
   ) {}
+
+  // The company's clock, as in "+01:00"; Algeria when it can't be read
+  private async utcOffset() {
+    const companyId = currentCompanyId();
+    const company = companyId
+      ? await this.companiesService.findById(companyId)
+      : null;
+    const offset = company?.settings?.utcOffset ?? '';
+
+    return /^[+-]\d{2}:\d{2}$/.test(offset) ? offset : '+01:00';
+  }
 
  async updateDeviceLog(id: string, timestamp: string) {
   if (!Types.ObjectId.isValid(id)) {
@@ -74,14 +89,13 @@ export class AttendanceService {
       await this.deviceService.getAttendanceLogs();
 
     let newCount = 0;
+    let skippedCount = 0;
 
     for (const log of logs) {
-      const deviceLogId = String(log.userSn);
-      const deviceUserId = String(log.deviceUserId);
+      const deviceUserId = String(log.deviceUserId ?? '');
       const timestamp = new Date(log.recordTime);
 
       if (
-        !deviceLogId ||
         !deviceUserId ||
         Number.isNaN(timestamp.getTime())
       ) {
@@ -90,12 +104,24 @@ export class AttendanceService {
           log,
         );
 
+        skippedCount++;
+
         continue;
       }
 
+      // A punch is known by employee + machine time: the machine's record
+      // number (userSn) starts again at 1 when its log is cleared. The time is
+      // kept in the id because a manager can correct the punch's timestamp, and
+      // that punch must not come back on the next sync. Punches saved before
+      // this have the record number as id: those match on the timestamp.
+      const deviceLogId = `${deviceUserId}-${timestamp.getTime()}`;
+
       const exists =
         await this.rawLogModel.findOne({
-          deviceLogId,
+          $or: [
+            { deviceLogId },
+            { deviceUserId, timestamp },
+          ],
         });
 
       if (!exists) {
@@ -111,7 +137,7 @@ export class AttendanceService {
     }
 
     this.logger.log(
-      `Sync complete — ${newCount} new logs saved out of ${logs.length} total`,
+      `Sync complete — ${newCount} new logs saved out of ${logs.length} total, ${skippedCount} skipped`,
     );
   }
 
@@ -143,7 +169,7 @@ export class AttendanceService {
   }
 
   // Generate a unique ID for manually-created punches.
-  // Device punches use the device's userSn as deviceLogId.
+  // Device punches use the employee and the machine's time as deviceLogId.
   const deviceLogId = `manual-${Date.now()}-${Math.random()
     .toString(36)
     .substring(2, 8)}`;
@@ -203,17 +229,21 @@ export class AttendanceService {
     const filter: any = {};
 
     if (from || to) {
+      // Days are the company's days, not UTC ones: at 00:30 in Algeria, UTC
+      // is still on the day before.
+      const offset = await this.utcOffset();
+
       filter.timestamp = {};
 
       if (from) {
         filter.timestamp.$gte = new Date(
-          `${from}T00:00:00.000Z`,
+          `${from}T00:00:00.000${offset}`,
         );
       }
 
       if (to) {
         filter.timestamp.$lte = new Date(
-          `${to}T23:59:59.999Z`,
+          `${to}T23:59:59.999${offset}`,
         );
       }
     }

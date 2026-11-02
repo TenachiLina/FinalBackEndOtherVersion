@@ -52,6 +52,17 @@ export class ManagerVisibilityService {
     };
   }
 
+  /** True when this employee record is the one linked to the manager's own account. */
+  async isOwnRecord(user: AuthUser, employeeId: string): Promise<boolean> {
+    if (user.role !== 'manager') return false;
+    const me = await this.userModel
+      .findById(user.id)
+      .select('employeeId')
+      .lean()
+      .exec();
+    return !!me?.employeeId && String(me.employeeId) === String(employeeId);
+  }
+
   /** Throws when this user may not see this employee's salary data. */
   async assertVisible(user: AuthUser, empNumber: unknown) {
     const hidden = await this.hiddenFor(user);

@@ -21,13 +21,13 @@ export class Worktime {
   @Prop()
   work_date?: Date;
 
-  // First clock-in of the day
-  @Prop({ default: '00:00' })
-  clock_in?: string;
+  // First clock-in of the day. Empty means not clocked: "00:00" is a real midnight
+  @Prop({ type: String })
+  clock_in?: string | null;
 
-  // Final clock-out of the day
-  @Prop({ default: '00:00' })
-  clock_out?: string;
+  // Final clock-out of the day. Empty means not clocked: "00:00" is a real midnight
+  @Prop({ type: String })
+  clock_out?: string | null;
 
   // Total delay relative to the shift
   @Prop({ default: '0' })
@@ -75,3 +75,9 @@ export const WorktimeSchema =
 
 // Each record belongs to one company; see tenancy/tenant.plugin.ts
 WorktimeSchema.plugin(tenantPlugin);
+// One record per employee, shift and day, or payroll pays the day twice.
+// Existing duplicates must go first: see scripts/dedupe-worktime.js
+WorktimeSchema.index(
+  { companyId: 1, emp_id: 1, shift_id: 1, work_date: 1 },
+  { unique: true, partialFilterExpression: { work_date: { $type: 'date' } } },
+);

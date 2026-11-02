@@ -217,6 +217,7 @@ export class UsersService {
     const user = await this.findInCompany(id, companyId);
     const roleBefore = user.role;
     const activeBefore = user.active;
+    const employeeIdBefore = user.employeeId;
 
     if (input.name !== undefined) {
       const name = String(input.name).trim();
@@ -241,6 +242,25 @@ export class UsersService {
     await this.ensureAnotherActiveAdmin(user, companyId);
 
     const saved = await user.save();
+
+    // Two requests can pass the check above at the same moment. Count again
+    // after saving, and undo this change if it left the company with no admin.
+    const removedAnAdmin =
+      roleBefore === 'admin' &&
+      activeBefore &&
+      (saved.role !== 'admin' || !saved.active);
+    if (removedAnAdmin && !(await this.hasActiveAdmin(companyId))) {
+      await this.userModel
+        .updateOne(
+          { _id: saved._id },
+          { role: roleBefore, active: activeBefore, employeeId: employeeIdBefore },
+        )
+        .exec();
+      throw new BadRequestException(
+        'The company must keep at least one active admin',
+      );
+    }
+
     // A changed role or a disabled account signs the person out everywhere,
     // so no token keeps working with the old rights.
     if (!saved.active && activeBefore) {
@@ -290,8 +310,21 @@ export class UsersService {
       throw new BadRequestException('You cannot delete your own account');
     }
     const user = await this.findInCompany(id, companyId);
+    const wasActiveAdmin = user.role === 'admin' && user.active;
     user.active = false; // treat as no longer an active admin for the check below
     await this.ensureAnotherActiveAdmin(user, companyId);
+
+    if (wasActiveAdmin) {
+      // Deactivate first, count again, and only then delete. A concurrent
+      // request can't leave the company without an admin.
+      await this.userModel.updateOne({ _id: id }, { active: false }).exec();
+      if (!(await this.hasActiveAdmin(companyId))) {
+        await this.userModel.updateOne({ _id: id }, { active: true }).exec();
+        throw new BadRequestException(
+          'The company must keep at least one active admin',
+        );
+      }
+    }
     await this.userModel.deleteOne({ _id: id }).exec();
     await this.sessions.revokeAllForUser(id, 'account_deleted', { by: actorId });
   }
@@ -343,5 +376,12 @@ export class UsersService {
         'The company must keep at least one active admin',
       );
     }
+  }
+  private async hasActiveAdmin(companyId: string): Promise<boolean> {
+    return !!(await this.userModel.exists({
+      ...this.inCompany(companyId),
+      role: 'admin',
+      active: true,
+    }));
   }
 }
