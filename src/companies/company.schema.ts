@@ -27,6 +27,10 @@ export class CompanySettings {
   @Prop({ default: 26 }) workingDaysPerMonth!: number;
   // Share of earned pay offered as a weekly advance (0.5 = half)
   @Prop({ default: 0.5 }) weeklyAdvanceRatio!: number;
+  // Payslip header (the company name comes from Company.name)
+  @Prop({ trim: true }) payslipActivity?: string;
+  @Prop({ trim: true }) payslipAddress?: string;
+  @Prop({ trim: true }) payslipContributorNumber?: string;
 }
 export const CompanySettingsSchema =
   SchemaFactory.createForClass(CompanySettings);

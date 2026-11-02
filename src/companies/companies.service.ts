@@ -242,7 +242,23 @@ export class CompaniesService {
     if (!['en', 'fr', 'ar'].includes(language)) {
       throw new BadRequestException('Language must be en, fr or ar');
     }
+    const text = (v: unknown, field: string, max: number) => {
+      const value = v == null ? '' : String(v).trim();
+      if (value.length > max) {
+        throw new BadRequestException(
+          `${field} must be at most ${max} characters`,
+        );
+      }
+      return value || undefined;
+    };
     return {
+      payslipActivity: text(s.payslipActivity, 'Activity', 120),
+      payslipAddress: text(s.payslipAddress, 'Address', 200),
+      payslipContributorNumber: text(
+        s.payslipContributorNumber,
+        'Contributor number',
+        40,
+      ),
       language,
       currency,
       utcOffset: String(s.utcOffset),

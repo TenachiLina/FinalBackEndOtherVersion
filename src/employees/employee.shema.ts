@@ -13,6 +13,14 @@ export class Employee {
   @Prop({ required: true, min: 1 }) empNumber!: number;
   @Prop({ required: true }) firstName!: string;
   @Prop({ required: true }) lastName!: string;
+  // Shown on the payslip (fiche de paie)
+  @Prop({ trim: true }) jobTitle?: string;
+  // C, M, D or V (célibataire, marié(e), divorcé(e), veuf/veuve)
+  @Prop({ trim: true }) familyStatus?: string;
+  // "YYYY-MM-DD"
+  @Prop({ trim: true }) birthDate?: string;
+  @Prop({ trim: true }) hireDate?: string;
+  @Prop({ trim: true }) socialSecurityNumber?: string;
 }
 
 export const EmployeeSchema = SchemaFactory.createForClass(Employee);
