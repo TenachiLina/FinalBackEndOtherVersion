@@ -44,6 +44,7 @@ import { ZktecoModule } from './zkteco/zkteco.module';
 import { AuthModule } from './auth/auth.module';
 import { AuditModule } from './audit/audit.module';
 import { ErrorLogsModule } from './error-logs/error-logs.module';
+import { ReportsModule } from './reports/reports.module';
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import { ErrorLogsModule } from './error-logs/error-logs.module';
     AuthModule,
     AuditModule,
     ErrorLogsModule,
+    ReportsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
