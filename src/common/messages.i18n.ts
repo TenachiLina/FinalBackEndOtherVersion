@@ -215,6 +215,18 @@ const EXACT: Record<string, Tr> = {
     fr: 'La date doit être au format AAAA-MM-JJ',
     ar: 'يجب أن يكون التاريخ بصيغة YYYY-MM-DD',
   },
+  'start and end must be YYYY-MM-DD dates': {
+    fr: 'Le début et la fin doivent être des dates au format AAAA-MM-JJ',
+    ar: 'يجب أن تكون البداية والنهاية تواريخ بصيغة YYYY-MM-DD',
+  },
+  'start must be on or before end': {
+    fr: 'Le début doit être avant ou égal à la fin',
+    ar: 'يجب أن تكون البداية قبل النهاية أو مساوية لها',
+  },
+  'The period can be at most 366 days': {
+    fr: 'La période ne peut pas dépasser 366 jours',
+    ar: 'لا يمكن أن تتجاوز الفترة 366 يومًا',
+  },
   'emp_id is required': { fr: "L'employé est obligatoire", ar: 'الموظف مطلوب' },
   'reason is required': { fr: 'Le motif est obligatoire', ar: 'السبب مطلوب' },
   'Choose the month to copy and the month to copy to': {
