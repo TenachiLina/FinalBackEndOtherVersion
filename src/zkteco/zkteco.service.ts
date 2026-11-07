@@ -12,14 +12,18 @@ export interface ZktecoSaveResult {
   duplicates: number;
   rejected: number;
 }
+import { RawAttendanceLog, RawAttendanceLogDocument } from '../attendance/raw-attendance-log.schema';
+
 
 @Injectable()
 export class ZktecoService {
   private readonly logger = new Logger(ZktecoService.name);
 
-  constructor(
-    @InjectModel(ZktecoAttendanceEvent.name)
-    private readonly eventModel: Model<ZktecoAttendanceEventDocument>,
+ constructor(
+     @InjectModel(ZktecoAttendanceEvent.name)
+     private readonly eventModel: Model<ZktecoAttendanceEventDocument>,
+     @InjectModel(RawAttendanceLog.name)
+     private readonly rawModel: Model<RawAttendanceLogDocument>,
   ) {}
 
   /**
@@ -103,6 +107,25 @@ export class ZktecoService {
         } else {
           result.duplicates++;
         }
+
+        const deviceLogId = `${employeePin}-${eventTime.getTime()}`;
+        await this.rawModel.updateOne(
+          {
+            $or: [
+              { deviceLogId },
+              { deviceUserId: employeePin, timestamp: eventTime },
+            ],
+          },
+          {
+            $setOnInsert: {
+              deviceUserId: employeePin,
+              timestamp: eventTime,
+              deviceLogId,
+              processed: false,
+            },
+          },
+          { upsert: true },
+        );
       } catch (error: unknown) {
         if (
           typeof error === 'object' &&
