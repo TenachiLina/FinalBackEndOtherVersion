@@ -7,6 +7,8 @@ import {
   ZktecoAttendanceEvent,
   ZktecoAttendanceEventSchema,
 } from './schemas/zkteco-attendance-event.schema';
+import { RawAttendanceLog, RawAttendanceLogSchema } from '../attendance/raw-attendance-log.schema';
+
 
 @Module({
   imports: [
@@ -15,6 +17,10 @@ import {
       {
         name: ZktecoAttendanceEvent.name,
         schema: ZktecoAttendanceEventSchema,
+      },
+      { 
+        name: RawAttendanceLog.name, 
+        schema: RawAttendanceLogSchema 
       },
     ]),
   ],

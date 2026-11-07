@@ -147,6 +147,25 @@ describe('PATCH /companies/:id', () => {
     });
   });
 
+  it('saves the payslip header, and keeps it when other settings change', async () => {
+    const c = await seed.company();
+    await sa.patch(`/companies/${c.id}`).send({
+      settings: {
+        payslipActivity: 'RESTAURATION RAPIDE',
+        payslipAddress: 'UV 10\nALI MENDJELI',
+        payslipContributorNumber: '123',
+      },
+    });
+    const res = await sa
+      .patch(`/companies/${c.id}`)
+      .send({ settings: { currency: 'EUR' } });
+    expect(res.body.settings).toMatchObject({
+      payslipActivity: 'RESTAURATION RAPIDE',
+      payslipAddress: 'UV 10\nALI MENDJELI',
+      payslipContributorNumber: '123',
+    });
+  });
+
   it.each([
     [{ currency: '' }, 'Currency must be 1 to 8 characters'],
     [{ currency: 'TOOLONGCUR' }, 'Currency must be 1 to 8 characters'],

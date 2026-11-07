@@ -145,6 +145,8 @@ describe('employees', () => {
         baseSalary: 45000,
         phoneNumber: '0661',
         address: 'Alger',
+        socialSecurityNumber: '000000000000',
+        birthDate: '1990-01-01',
       });
       const crew = await seed.employee(company.id, {
         firstName: 'Crew',
@@ -170,6 +172,8 @@ describe('employees', () => {
       expect(other).not.toHaveProperty('baseSalary');
       expect(other).not.toHaveProperty('phoneNumber');
       expect(other).not.toHaveProperty('address');
+      expect(other).not.toHaveProperty('socialSecurityNumber');
+      expect(other).not.toHaveProperty('birthDate');
       expect(list.find((e: any) => e.firstName === 'Crew').baseSalary).toBe(
         25000,
       );
