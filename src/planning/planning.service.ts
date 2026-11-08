@@ -26,13 +26,18 @@ export class PlanningService {
       filter.planDate = { $gte: start, $lte: end };
     }
 
-   return this.planningModel
-    .find(filter)
-    .populate('shiftId')
-    .populate('empId')
-    .populate('backupEmpId')     // legacy: remove after the cleanup
-    .populate('backupEmpIds')
-    .exec();
+    const planning = await this.planningModel
+      .find(filter)
+      .populate('shiftId')
+      .populate('empId')
+      .populate('backupEmpId')     // legacy: remove after the cleanup
+      .populate('backupEmpIds')
+      .exec();
+
+    // An employee or shift deleted since comes back as null and crashed the
+    // Clock-in pages ("Cannot read properties of null (reading '_id')"): leave
+    // those entries out, as the view and the exports already do.
+    return planning.filter((item) => item.empId && item.shiftId);
   }
 
   // /** Keep existing planning entries in the database.
