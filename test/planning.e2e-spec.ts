@@ -99,6 +99,21 @@ describe('single entries', () => {
     expect((await admin.get('/planning?planDate=2026-10-20')).body).toEqual([]);
   });
 
+  it('leaves out entries whose employee or shift was deleted when listing a day', async () => {
+    const { admin, morning, evening, ali, sara, omar, plan } = await setup();
+    await plan(ali, morning, '2026-10-20');
+    await plan(sara, evening, '2026-10-20');
+    await plan(omar, morning, '2026-10-20');
+    await admin.delete(`/employees/${ali._id}`);
+    await admin.delete(`/shifts/${evening._id}?force=true`);
+
+    // The Clock-in pages read empId._id / shiftId._id of every entry
+    const res = await admin.get('/planning?planDate=2026-10-20');
+    expect(res.status).toBe(200);
+    expect(names(res)).toEqual(['Omar@2026-10-20']);
+    expect((await admin.get('/planning')).body).toHaveLength(1);
+  });
+
   it('requires an employee, a shift, a task and a date', async () => {
     const { admin } = await setup();
     const res = await admin.post('/planning').send({});
