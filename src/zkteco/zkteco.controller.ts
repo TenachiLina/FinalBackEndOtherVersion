@@ -74,6 +74,7 @@ export class ZktecoController {
       'TransFlag=TransData AttLog OpLog EnrollUser',
       'Realtime=1',
       'Encrypt=None',
+      'TimeZone=1',
       '',
     ].join('\r\n');
 
