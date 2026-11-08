@@ -21,6 +21,28 @@ import {
   RawAttendanceLogDocument,
 } from './raw-attendance-log.schema';
 
+/**
+ * node-zklib reads the machine's clock (the company's local time) and builds a
+ * Date in the server's own time zone, so on a UTC server 15:00 in Algeria came
+ * out as 15:00Z, one hour late. Read the wall-clock parts back and attach the
+ * company's offset to get the real instant, the same one the ADMS push stores
+ * (src/zkteco), so a punch pulled by Sync and pushed by the machine match.
+ */
+export function machineTimeToUtc(
+  recordTime: unknown,
+  offset: string,
+): Date {
+  const local = new Date(recordTime as string | number | Date);
+  if (Number.isNaN(local.getTime())) return local;
+
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return new Date(
+    `${local.getFullYear()}-${pad(local.getMonth() + 1)}-${pad(local.getDate())}` +
+      `T${pad(local.getHours())}:${pad(local.getMinutes())}:${pad(local.getSeconds())}` +
+      offset,
+  );
+}
+
 @Injectable()
 export class AttendanceService {
   private readonly logger = new Logger(
@@ -90,10 +112,11 @@ export class AttendanceService {
 
     let newCount = 0;
     let skippedCount = 0;
+    const offset = await this.utcOffset();
 
     for (const log of logs) {
       const deviceUserId = String(log.deviceUserId ?? '');
-      const timestamp = new Date(log.recordTime);
+      const timestamp = machineTimeToUtc(log.recordTime, offset);
 
       if (
         !deviceUserId ||
@@ -115,12 +138,19 @@ export class AttendanceService {
       // that punch must not come back on the next sync. Punches saved before
       // this have the record number as id: those match on the timestamp.
       const deviceLogId = `${deviceUserId}-${timestamp.getTime()}`;
+      // Punches synced before the UTC fix were saved with the machine's local
+      // time read as UTC (one hour late in Algeria): match those too, or every
+      // punch still on the machine would come back as a duplicate.
+      const legacyTimestamp = new Date(log.recordTime);
+      const legacyDeviceLogId = `${deviceUserId}-${legacyTimestamp.getTime()}`;
 
       const exists =
         await this.rawLogModel.findOne({
           $or: [
             { deviceLogId },
             { deviceUserId, timestamp },
+            { deviceLogId: legacyDeviceLogId },
+            { deviceUserId, timestamp: legacyTimestamp },
           ],
         });
 

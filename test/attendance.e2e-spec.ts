@@ -59,7 +59,8 @@ describe('POST /attendance/sync', () => {
     expect(saved).toHaveLength(3);
     expect(
       saved.find(
-        (p: any) => p.timestamp.toISOString() === '2026-10-20T16:00:00.000Z',
+        // 16:00 on the machine is 15:00 UTC (Algeria, UTC+1)
+        (p: any) => p.timestamp.toISOString() === '2026-10-20T15:00:00.000Z',
       ),
     ).toMatchObject({
       deviceUserId: '7',
@@ -77,7 +78,20 @@ describe('POST /attendance/sync', () => {
     expect((await admin.post('/attendance/sync')).body.status).toBe('success');
     expect(
       (await punches(company.id)).map((p: any) => p.timestamp.toISOString()),
-    ).toEqual(['2026-10-20T07:00:00.000Z']);
+    ).toEqual(['2026-10-20T06:00:00.000Z']);
+  });
+
+  it('stores the machine’s local time as real UTC, like the ADMS push', async () => {
+    const { company, admin } = await setup();
+    // The machine's clock reads 15:00 (Algeria). node-zklib builds that in the
+    // server's zone, which is UTC on Render (and in these tests).
+    fakeDevice.attendances = [devicePunch(1, '7', '2026-11-08T15:00:00Z')];
+    await admin.post('/attendance/sync');
+
+    const [punch] = await punches(company.id);
+    expect(punch.timestamp.toISOString()).toBe('2026-11-08T14:00:00.000Z');
+    // The id the ADMS push gives this punch, so pull + push save it once
+    expect(punch.deviceLogId).toBe(`7-${Date.parse('2026-11-08T14:00:00Z')}`);
   });
 
   it('skips a punch without an employee', async () => {
