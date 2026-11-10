@@ -21,14 +21,17 @@ import { WorktimeService } from '../worktime/worktime.service';
 import { PlanningService } from '../planning/planning.service';
 import { CompaniesService } from '../companies/companies.service';
 import { currentCompanyId } from '../tenancy/tenant-context';
+import {
+  groupPunchesIntoSessions,
+  plannedShiftsByEmployee,
+  type PlannedShift as SessionShift,
+  type PlanningLike,
+} from './punch-sessions';
 
-// A clock-in older than this no longer counts as "currently clocked in", so a
-// forgotten clock-out doesn't block tomorrow's clock-in. Covers long and
-// overnight shifts.
-const SESSION_WINDOW_MS = 16 * 60 * 60 * 1000;
-// How far back punches are read to tell clock-ins from clock-outs. Any gap
-// longer than the session window (a day off) puts the reading back in step.
-const PUNCH_HISTORY_MS = 31 * 24 * 60 * 60 * 1000;
+// How far back punches are read to tell clock-ins from clock-outs. Punches
+// are grouped into sessions on the planned shifts (see punch-sessions.ts), so
+// a session never reaches further back than the day before.
+const PUNCH_HISTORY_MS = 2 * 24 * 60 * 60 * 1000;
 
 type ClockAction = 'in' | 'out';
 
@@ -73,7 +76,9 @@ export class KioskController {
   /** Employees with whether each is clocked in right now. No salaries. */
   @Get('employees')
   async employees() {
-    const [employees, recent] = await Promise.all([
+    const offset = await this.companyOffset();
+    const now = new Date();
+    const [employees, recent, planned] = await Promise.all([
       this.employeeModel
         .find()
         .select('empNumber firstName lastName personalImage')
@@ -81,10 +86,17 @@ export class KioskController {
         .lean()
         .exec(),
       this.recentPunches(),
+      this.plannedAround(now, offset),
     ]);
 
     return employees.map((e) => {
-      const state = this.stateOf(recent.get(String(e.empNumber)) ?? []);
+      const key = String(e.empNumber);
+      const state = this.stateOf(
+        recent.get(key) ?? [],
+        planned.get(key) ?? [],
+        offset,
+        now,
+      );
       return {
         id: String(e._id),
         empNumber: e.empNumber,
@@ -114,10 +126,16 @@ export class KioskController {
     if (!employee) throw new NotFoundException('Employee not found');
 
     const name = `${employee.firstName} ${employee.lastName}`.trim();
-    const recent = await this.recentPunches(String(employee.empNumber));
-    const { clockedIn, since } = this.stateOf(
-      recent.get(String(employee.empNumber)) ?? [],
-    );
+    const key = String(employee.empNumber);
+    const now = new Date();
+    const offset = await this.companyOffset();
+    const [recent, plannedAll] = await Promise.all([
+      this.recentPunches(key),
+      this.plannedAround(now, offset),
+    ]);
+    const punches = recent.get(key) ?? [];
+    const planned: SessionShift[] = plannedAll.get(key) ?? [];
+    const { clockedIn, since } = this.stateOf(punches, planned, offset, now);
     if (action === 'in' && clockedIn) {
       throw new ConflictException(`${name} is already clocked in`);
     }
@@ -125,7 +143,16 @@ export class KioskController {
       throw new ConflictException(`${name} isn't clocked in yet`);
     }
 
-    const now = new Date();
+    // The work day this press counts for: the session it joins, on the
+    // planned shift (a night shift's clock-out after midnight, an early
+    // shift's clock-in before it starts)
+    const workDate = this.sessionOf(
+      [...punches, now],
+      planned,
+      offset,
+      now,
+    )?.workDate;
+
     await this.attendanceService.createDeviceLog({
       deviceUserId: String(employee.empNumber),
       timestamp: now.toISOString(),
@@ -139,6 +166,7 @@ export class KioskController {
         action,
         now,
         since ? new Date(since) : null,
+        workDate,
       );
     } catch (err) {
       this.logger.error(
@@ -165,6 +193,7 @@ export class KioskController {
     action: ClockAction,
     now: Date,
     since: Date | null,
+    sessionDate?: string,
   ) {
     const companyId = currentCompanyId();
     const company = companyId
@@ -181,9 +210,11 @@ export class KioskController {
 
     const nowLocal = local(now);
     const sinceLocal = since ? local(since) : null;
-    // A clock-out belongs to the day of its clock-in (overnight shifts)
+    // The session's work day; else a clock-out belongs to the day of its
+    // clock-in (overnight shifts)
     const workDate =
-      action === 'out' && sinceLocal ? sinceLocal.date : nowLocal.date;
+      sessionDate ??
+      (action === 'out' && sinceLocal ? sinceLocal.date : nowLocal.date);
 
     const [existing] = await this.worktimeService.findAll({
       emp_id: empNumber,
@@ -196,9 +227,7 @@ export class KioskController {
         ? nowLocal.time
         : (sinceLocal?.time ?? nowLocal.time);
     const clockOut =
-      action === 'out'
-        ? nowLocal.time
-        : existing?.clock_out || null;
+      action === 'out' ? nowLocal.time : existing?.clock_out || null;
 
     const shift = await this.plannedShift(
       empNumber,
@@ -298,19 +327,76 @@ export class KioskController {
     return byEmployee;
   }
 
-  // Punches alternate in, out, in, out… A punch closes the open clock-in, unless
-  // that clock-in has expired (a forgotten clock-out): then it starts a new
-  // session. Walking the history keeps a 17:00 clock-out a clock-out, even once
-  // its 08:00 clock-in is more than a session window old.
-  private stateOf(punches: Date[]) {
-    const expired = (clockIn: Date, at: number) =>
-      at - clockIn.getTime() > SESSION_WINDOW_MS;
+  /** The company's UTC offset in minutes. */
+  private async companyOffset() {
+    const companyId = currentCompanyId();
+    const company = companyId
+      ? await this.companiesService.findById(companyId)
+      : null;
+    return this.offsetMinutes(company?.settings?.utcOffset);
+  }
 
-    let open: Date | null = null;
-    for (const punch of punches) {
-      open = open && !expired(open, punch.getTime()) ? null : punch;
-    }
-    const since = open && !expired(open, Date.now()) ? open : null;
-    return { clockedIn: since !== null, since: since?.toISOString() ?? null };
+  /** Planned shifts of yesterday, today and tomorrow, by employee number. */
+  private async plannedAround(now: Date, offset: number) {
+    const local = new Date(now.getTime() + offset * 60_000);
+    const result = new Map<string, SessionShift[]>();
+    await Promise.all(
+      [-1, 0, 1].map(async (days) => {
+        const d = new Date(local);
+        d.setUTCDate(d.getUTCDate() + days);
+        const date = d.toISOString().slice(0, 10);
+        const records = (await this.planningService.findAll({
+          planDate: date,
+        })) as unknown as PlanningLike[];
+        plannedShiftsByEmployee(records, () => date).forEach((shifts, key) => {
+          result.set(key, [...(result.get(key) ?? []), ...shifts]);
+        });
+      }),
+    );
+    return result;
+  }
+
+  /** The session of the last punch (see punch-sessions.ts). */
+  private sessionOf(
+    punches: Date[],
+    planned: SessionShift[],
+    offset: number,
+    now: Date,
+  ) {
+    const last = punches[punches.length - 1];
+    if (!last) return null;
+    return (
+      groupPunchesIntoSessions(
+        punches.map((p) => ({ timestamp: p.toISOString() })),
+        planned,
+        { now: now.getTime(), offsetMinutes: offset },
+      ).find((s) =>
+        s.punches.some((p) => p.timestamp === last.toISOString()),
+      ) ?? null
+    );
+  }
+
+  // Punches are grouped into sessions on the planned shifts: a missing punch
+  // spoils one session instead of turning every later clock-in into a
+  // clock-out. The employee is clocked in while their latest session is still
+  // in progress and its last period has a clock-in and no clock-out.
+  private stateOf(
+    punches: Date[],
+    planned: SessionShift[],
+    offset: number,
+    now: Date,
+  ) {
+    const sessions = groupPunchesIntoSessions(
+      punches.map((p) => ({ timestamp: p.toISOString() })),
+      planned,
+      { now: now.getTime(), offsetMinutes: offset },
+    );
+    const last = sessions[sessions.length - 1];
+    const period = last?.periods[last.periods.length - 1];
+    const since =
+      last?.open && period?.clockIn && !period.clockOut
+        ? period.clockIn.timestamp
+        : null;
+    return { clockedIn: since !== null, since };
   }
 }

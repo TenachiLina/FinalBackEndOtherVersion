@@ -477,6 +477,52 @@ describe('POST /kiosk/clock', () => {
     });
   });
 
+  // A missing clock-in used to turn every later clock-in into a clock-out
+  it('reads a night shift’s lone clock-out as a clock-out, so the next clock-in still works', async () => {
+    const { company, empNumber, clock, plan, at, worktime } = await setup();
+    await plan('2026-10-19', '16:00', '02:00');
+    await plan('2026-10-20', '16:00', '02:00');
+    // The machine only has the clock-out of the night of Oct 19
+    await runForCompany(company.id, async () => {
+      await t.model('RawAttendanceLog').create({
+        deviceUserId: String(empNumber),
+        timestamp: new Date('2026-10-19T23:34:00Z'),
+        deviceLogId: 'machine-1',
+      });
+    });
+    const kiosk = await at('2026-10-20T15:00:00');
+    expect((await kiosk.get('/kiosk/employees')).body[0].clockedIn).toBe(false);
+
+    expect((await clock('2026-10-20T16:30:00', 'in')).status).toBe(201);
+    expect((await clock('2026-10-21T00:40:00', 'out')).status).toBe(201);
+    expect(await worktime()).toEqual([
+      expect.objectContaining({
+        work_date: '2026-10-20',
+        clock_in: '16:30',
+        clock_out: '00:40',
+      }),
+    ]);
+  });
+
+  it('files an early shift’s clock-in before it starts under its own day', async () => {
+    const { clock, plan, worktime } = await setup();
+    await plan('2026-10-19', '02:00', '10:00');
+    const early = await plan('2026-10-20', '02:00', '10:00');
+    await clock('2026-10-19T01:55:00', 'in');
+    await clock('2026-10-19T10:00:00', 'out');
+    expect((await clock('2026-10-20T01:56:00', 'in')).status).toBe(201);
+    await clock('2026-10-20T10:05:00', 'out');
+    expect((await worktime()).filter((r) => r.work_date === '2026-10-20')).toEqual([
+      expect.objectContaining({
+        work_date: '2026-10-20',
+        shift_id: early,
+        clock_in: '01:56',
+        clock_out: '10:05',
+        late_minutes: '0',
+      }),
+    ]);
+  });
+
   it.each([
     ['+02:00', '09:05'],
     ['-03:00', '04:05'],
