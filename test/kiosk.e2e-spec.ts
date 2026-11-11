@@ -512,7 +512,9 @@ describe('POST /kiosk/clock', () => {
     await clock('2026-10-19T10:00:00', 'out');
     expect((await clock('2026-10-20T01:56:00', 'in')).status).toBe(201);
     await clock('2026-10-20T10:05:00', 'out');
-    expect((await worktime()).filter((r) => r.work_date === '2026-10-20')).toEqual([
+    expect(
+      (await worktime()).filter((r) => r.work_date === '2026-10-20'),
+    ).toEqual([
       expect.objectContaining({
         work_date: '2026-10-20',
         shift_id: early,
