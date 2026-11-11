@@ -23,7 +23,12 @@ describe('labor summary', () => {
       startTime: '08:00',
       endTime: '16:00',
     });
-    const emp = await seed.employee(company.id, { empNumber: 7 });
+    const emp = await seed.employee(company.id, {
+      empNumber: 7,
+      baseSalary: 30000,
+      insured: true,
+      declaredSalary: 24000,
+    });
     await seed.planning(company.id, {
       empId: String(emp._id),
       shiftId: String(shift._id),
@@ -76,7 +81,7 @@ describe('labor summary', () => {
     expect(res.status).toBe(200);
     expect(res.body.metadata).toMatchObject({
       source: 'clockinout',
-      version: '1',
+      version: '2',
       period: { start: '2026-10-01', end: '2026-10-31' },
       stations: [{ code: '1', name: 'Grill', active: true }],
     });
@@ -87,6 +92,10 @@ describe('labor summary', () => {
       plannedHours: 8,
       bonuses: 500,
       advancesPaid: 1000,
+      // One month of salary, 34% of the declared 24 000, plus the bonus
+      baseSalaries: 30000,
+      employerCharges: 8160,
+      totalLaborCost: 38660,
     });
     expect(res.body.periodTotals).toEqual([
       {
@@ -97,6 +106,9 @@ describe('labor summary', () => {
         regularHours: 8,
         overtimeHours: 1,
         plannedHours: 8,
+        baseSalaries: 30000,
+        employerCharges: 8160,
+        totalLaborCost: 38160,
       },
     ]);
     expect(res.body.plannedShifts).toEqual([
@@ -116,10 +128,13 @@ describe('labor summary', () => {
         employeeRef: expect.stringMatching(/^E-/),
         stationCode: '1',
         hoursWorked: 9,
+        laborCost: 38160,
       },
     ]);
     // No names or employee numbers leave the app
-    expect(JSON.stringify(res.body)).not.toMatch(/First|Last|empNumber|emp_id/);
+    expect(JSON.stringify(res.body)).not.toMatch(
+      /First|Last|empNumber|emp_id|declaredSalary|insured/,
+    );
   });
 
   it('is for admins only', async () => {
