@@ -114,6 +114,20 @@ describe('single entries', () => {
     expect((await admin.get('/planning')).body).toHaveLength(1);
   });
 
+  it('lists a range of days with from and to, both included', async () => {
+    const { admin, morning, ali, sara, omar, plan } = await setup();
+    await plan(ali, morning, '2026-10-19');
+    await plan(sara, morning, '2026-10-20');
+    await plan(omar, morning, '2026-10-22');
+
+    const res = await admin.get('/planning?from=2026-10-19&to=2026-10-21');
+    expect(res.status).toBe(200);
+    expect(names(res).sort()).toEqual(['Ali@2026-10-19', 'Sara@2026-10-20']);
+    expect(
+      (await admin.get('/planning?from=2026-10-20&to=nonsense')).status,
+    ).toBe(400);
+  });
+
   it('requires an employee, a shift, a task and a date', async () => {
     const { admin } = await setup();
     const res = await admin.post('/planning').send({});

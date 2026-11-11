@@ -463,6 +463,65 @@ describe('buildLaborSummary', () => {
       advancesPaid: 2000,
     });
   });
+
+  it('copes with deleted employees, shifts and tasks, undated records and bad amounts', () => {
+    const r = buildLaborSummary(
+      input({
+        planning: [
+          // Employee deleted since
+          {
+            empId: 'gone',
+            shiftId: 's1',
+            taskId: 1,
+            planDate: day('2026-10-05'),
+          },
+          // Shift deleted since: no times, so no planned hours or slot
+          {
+            empId: 'e1',
+            shiftId: 'gone',
+            taskId: 1,
+            planDate: day('2026-10-05'),
+          },
+          // Task deleted since
+          {
+            empId: 'e2',
+            shiftId: 's1',
+            taskId: 9,
+            planDate: day('2026-10-05'),
+          },
+          // Two slots at one station on one day: by start time
+          {
+            empId: 'e3',
+            shiftId: 's2',
+            taskId: 1,
+            planDate: day('2026-10-05'),
+          },
+        ],
+        worktime: [
+          { emp_id: 3, work_hours: '08:00' }, // no date: left out
+          { emp_id: 9, work_date: day('2026-10-05'), work_hours: '02:00' },
+        ],
+        bonuses: [{ amount: 'abc' as unknown as number }, { amount: 100 }],
+        advances: [{ amount: undefined as unknown as number }],
+      }),
+    );
+    expect(r.periodTotals).toMatchObject([
+      {
+        stationCode: '1',
+        stationName: 'Grill',
+        headcount: 3,
+        plannedHours: 16,
+      },
+      { stationCode: '9', stationName: null, headcount: 1, plannedHours: 8 },
+      { stationCode: null, regularHours: 2 },
+    ]);
+    expect(r.plannedShifts.map((x) => `${x.stationCode} ${x.start}`)).toEqual([
+      '1 08:00',
+      '1 18:00',
+      '9 08:00',
+    ]);
+    expect(r.siteTotals).toMatchObject({ bonuses: 100, advancesPaid: 0 });
+  });
 });
 
 describe('monthsCovered', () => {

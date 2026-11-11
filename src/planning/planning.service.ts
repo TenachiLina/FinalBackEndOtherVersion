@@ -24,6 +24,26 @@ export class PlanningService {
       const start = new Date(query.planDate); start.setHours(0, 0, 0, 0);
       const end   = new Date(query.planDate); end.setHours(23, 59, 59, 999);
       filter.planDate = { $gte: start, $lte: end };
+    } else if (query.from || query.to) {
+      // A range of days (YYYY-MM-DD, both included): the Clock-in History
+      // page needs the planning of its whole period to tell clock-ins from
+      // clock-outs
+      const day = /^\d{4}-\d{2}-\d{2}$/;
+      if (
+        (query.from && !day.test(String(query.from))) ||
+        (query.to && !day.test(String(query.to)))
+      ) {
+        throw new BadRequestException('date must be YYYY-MM-DD');
+      }
+      filter.planDate = {};
+      if (query.from) {
+        const start = new Date(query.from); start.setHours(0, 0, 0, 0);
+        filter.planDate.$gte = start;
+      }
+      if (query.to) {
+        const end = new Date(query.to); end.setHours(23, 59, 59, 999);
+        filter.planDate.$lte = end;
+      }
     }
 
     const planning = await this.planningModel
