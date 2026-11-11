@@ -24,6 +24,7 @@ function withoutPrivateFields(employee: any) {
     birthDate,
     hireDate,
     socialSecurityNumber,
+    declaredSalary,
     ...rest
   } = employee.toObject ? employee.toObject() : employee;
   return { ...rest, otherManager: true };
