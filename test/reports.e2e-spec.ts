@@ -81,7 +81,7 @@ describe('labor summary', () => {
     expect(res.status).toBe(200);
     expect(res.body.metadata).toMatchObject({
       source: 'clockinout',
-      version: '2',
+      version: '3',
       period: { start: '2026-10-01', end: '2026-10-31' },
       stations: [{ code: '1', name: 'Grill', active: true }],
     });
@@ -106,6 +106,8 @@ describe('labor summary', () => {
         regularHours: 8,
         overtimeHours: 1,
         plannedHours: 8,
+        justifiedAbsenceHours: 0,
+        unjustifiedAbsenceHours: 0,
         baseSalaries: 30000,
         employerCharges: 8160,
         totalLaborCost: 38160,
@@ -135,6 +137,53 @@ describe('labor summary', () => {
     expect(JSON.stringify(res.body)).not.toMatch(
       /First|Last|empNumber|emp_id|declaredSalary|insured/,
     );
+  });
+
+  it('splits absences into justified (with a comment) and unjustified', async () => {
+    const company = await seed.company();
+    const admin = await loginAs(t, await seed.user('admin', company.id));
+    await seed.task(company.id, { taskId: 1, taskName: 'Grill' });
+    const shift = await seed.shift(company.id, {
+      startTime: '08:00',
+      endTime: '14:00',
+    });
+    const emp = await seed.employee(company.id, { empNumber: 7 });
+    for (const date of ['2026-10-05', '2026-10-06']) {
+      await seed.planning(company.id, {
+        empId: String(emp._id),
+        shiftId: String(shift._id),
+        taskId: 1,
+        planDate: date,
+      });
+    }
+    await seed.worktime(company.id, {
+      emp_id: 7,
+      shift_id: String(shift._id),
+      work_date: new Date('2026-10-05'),
+      absent: true,
+      absent_comment: 'Sick note',
+    });
+    await seed.worktime(company.id, {
+      emp_id: 7,
+      shift_id: String(shift._id),
+      work_date: new Date('2026-10-06'),
+      absent: true,
+    });
+
+    const res = await admin.get(URL);
+    expect(res.status).toBe(200);
+    // The salary of someone with no hours worked goes to stationCode null
+    expect(res.body.periodTotals[0]).toMatchObject({
+      stationCode: '1',
+      justifiedAbsenceHours: 6,
+      unjustifiedAbsenceHours: 6,
+    });
+    expect(res.body.siteTotals).toMatchObject({
+      justifiedAbsenceHours: 6,
+      unjustifiedAbsenceHours: 6,
+    });
+    // The comment itself stays in the app
+    expect(JSON.stringify(res.body)).not.toContain('Sick note');
   });
 
   it('is for admins only', async () => {

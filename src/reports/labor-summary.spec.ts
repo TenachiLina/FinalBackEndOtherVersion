@@ -39,7 +39,7 @@ describe('buildLaborSummary', () => {
     expect(metadata).toEqual({
       source: 'clockinout',
       generatedAt: '2026-11-01T10:00:00.000Z',
-      version: '2',
+      version: '3',
       period: { start: '2026-10-01', end: '2026-10-31' },
       currency: 'DA',
       employerChargeRate: 0.34,
@@ -267,16 +267,10 @@ describe('buildLaborSummary', () => {
     expect(r.siteTotals.regularHours).toBe(12);
   });
 
-  it('leaves out absences and records with no worked time', () => {
+  it('leaves records with no worked time out of the worked hours', () => {
     const r = buildLaborSummary(
       input({
         worktime: [
-          {
-            emp_id: 1,
-            work_date: day('2026-10-05'),
-            work_hours: '08:00',
-            absent: true,
-          },
           { emp_id: 2, work_date: day('2026-10-05'), work_hours: '00:00' },
           { emp_id: 3, work_date: day('2026-10-05') },
         ],
@@ -285,6 +279,96 @@ describe('buildLaborSummary', () => {
     expect(r.periodTotals).toEqual([]);
     expect(r.dailyWorked).toEqual([]);
     expect(r.employeeLines).toEqual([]);
+  });
+
+  it("counts an absence for its planned shift's length at that station, justified when it has a comment", () => {
+    const r = buildLaborSummary(
+      input({
+        planning: [
+          {
+            empId: 'e1',
+            shiftId: 's1',
+            taskId: 1,
+            planDate: day('2026-10-05'),
+          },
+          {
+            empId: 'e2',
+            shiftId: 's2',
+            taskId: 2,
+            planDate: day('2026-10-05'),
+          },
+          {
+            empId: 'e1',
+            shiftId: 's1',
+            taskId: 1,
+            planDate: day('2026-10-06'),
+          },
+        ],
+        worktime: [
+          {
+            emp_id: 1,
+            shift_id: 's1',
+            work_date: day('2026-10-05'),
+            work_hours: '08:00',
+            absent: true,
+            absent_comment: 'Sick note',
+          },
+          { emp_id: 2, work_date: day('2026-10-05'), absent: true },
+          {
+            emp_id: 1,
+            work_date: day('2026-10-06'),
+            absent: true,
+            absent_comment: '   ',
+          },
+        ],
+      }),
+    );
+    expect(r.periodTotals).toMatchObject([
+      {
+        stationCode: '1',
+        justifiedAbsenceHours: 8,
+        unjustifiedAbsenceHours: 8,
+      },
+      {
+        stationCode: '2',
+        justifiedAbsenceHours: 0,
+        unjustifiedAbsenceHours: 8,
+      },
+    ]);
+    expect(r.siteTotals).toMatchObject({
+      justifiedAbsenceHours: 8,
+      unjustifiedAbsenceHours: 16,
+      regularHours: 0,
+    });
+    // An absence is not time worked
+    expect(r.dailyWorked).toEqual([]);
+  });
+
+  it("counts an absence with no planned shift for the company's hours per day, at no station", () => {
+    const absences = [
+      { emp_id: 1, work_date: day('2026-10-05'), absent: true },
+      {
+        emp_id: 2,
+        work_date: day('2026-10-05'),
+        absent: true,
+        absent_comment: 'Family event',
+      },
+    ];
+    const r = buildLaborSummary(input({ worktime: absences }));
+    expect(r.periodTotals).toMatchObject([
+      {
+        stationCode: null,
+        justifiedAbsenceHours: 8,
+        unjustifiedAbsenceHours: 8,
+      },
+    ]);
+    const seven = buildLaborSummary(
+      input({ worktime: absences, hoursPerDay: 7 }),
+    );
+    expect(seven.siteTotals).toMatchObject({
+      justifiedAbsenceHours: 7,
+      unjustifiedAbsenceHours: 7,
+    });
   });
 
   it('never counts more overtime than the time worked', () => {
@@ -440,7 +524,7 @@ describe('salaries and employer charges', () => {
       }),
     );
     expect(r.metadata).toMatchObject({
-      version: '2',
+      version: '3',
       employerChargeRate: 0.34,
     });
     expect(r.siteTotals).toMatchObject({
