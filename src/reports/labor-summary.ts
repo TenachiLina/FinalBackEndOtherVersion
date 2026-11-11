@@ -9,13 +9,23 @@ import { createHash } from 'crypto';
 // entry's task. Hours that match no entry are reported with stationCode
 // null, so the station rows always add up to the site totals.
 //
+// Salaries: each employee's monthly base salary counts for the share of
+// each calendar month the period covers (from their hire date, when set).
+// Employer charges are 34% of the declared salary of insured employees:
+// everything sent to social security (the employee's 9% and the
+// employer's 25%), as the company counts it. An employee's salary and charges are split between
+// stations by the hours they worked there; with no hours, they go to
+// stationCode null.
+//
 // Not included yet (the data doesn't exist): new hires, departures,
-// absence hours, salaries, overtime pay, employer charges, labor cost and
-// contract type. Bonuses and advances are per employee, so they are only
-// given for the whole site.
+// absence hours, overtime pay and contract type. Bonuses and advances are
+// per employee, so they are only given for the whole site.
 // ─────────────────────────────────────────────────────────────────────────
 
-export const LABOR_SUMMARY_VERSION = '1';
+export const LABOR_SUMMARY_VERSION = '2';
+
+/** Social security on the declared salary: the employee's 9% + the employer's 25% */
+export const EMPLOYER_CHARGE_RATE = 0.34;
 
 export interface Period {
   start: string; // "YYYY-MM-DD"
@@ -26,7 +36,14 @@ export interface LaborSummaryInput {
   period: Period;
   companyId: string;
   currency: string;
-  employees: { _id: unknown; empNumber: number }[];
+  employees: {
+    _id: unknown;
+    empNumber: number;
+    baseSalary?: number;
+    insured?: boolean;
+    declaredSalary?: number | null;
+    hireDate?: string; // "YYYY-MM-DD"
+  }[];
   tasks: { taskId: number; taskName: string }[];
   shifts: { _id: unknown; startTime: string; endTime: string }[];
   planning: {
@@ -79,6 +96,33 @@ function employeeRef(companyId: string, empNumber: number | string): string {
       .digest('hex')
       .slice(0, 12)
   );
+}
+
+/**
+ * How many monthly salaries a period is worth: each calendar month counts
+ * for the share of its days inside the period. Starts at `from` (a hire
+ * date) when that is later than the period start.
+ */
+export function monthsCovered(period: Period, from?: string): number {
+  const valid = (d?: string) => !!d && /^\d{4}-\d{2}-\d{2}$/.test(d);
+  const start =
+    valid(from) && from! > period.start ? from! : period.start;
+  if (start > period.end) return 0;
+  const utc = (d: string) => Date.parse(`${d}T00:00:00Z`);
+  const end = utc(period.end);
+  let months = 0;
+  let cursor = utc(start);
+  while (cursor <= end) {
+    const d = new Date(cursor);
+    const y = d.getUTCFullYear();
+    const m = d.getUTCMonth();
+    const monthEnd = Date.UTC(y, m + 1, 0);
+    const daysInMonth = new Date(monthEnd).getUTCDate();
+    const last = Math.min(monthEnd, end);
+    months += ((last - cursor) / 86_400_000 + 1) / daysInMonth;
+    cursor = Date.UTC(y, m + 1, 1);
+  }
+  return months;
 }
 
 export function buildLaborSummary(input: LaborSummaryInput) {
@@ -175,7 +219,12 @@ export function buildLaborSummary(input: LaborSummaryInput) {
   >();
   const perEmployee = new Map<
     string,
-    { employeeRef: string; stationCode: StationCode; minutes: number }
+    {
+      employeeRef: string;
+      stationCode: StationCode;
+      minutes: number;
+      cost?: number;
+    }
   >();
 
   for (const w of input.worktime) {
@@ -214,6 +263,42 @@ export function buildLaborSummary(input: LaborSummaryInput) {
     perEmployee.set(lineKey, line);
   }
 
+  // ── Salaries and charges ─────────────────────────────────────────────
+  const salaries = new Map<StationCode, number>();
+  const charges = new Map<StationCode, number>();
+  const add = (m: Map<StationCode, number>, k: StationCode, v: number) =>
+    m.set(k, (m.get(k) ?? 0) + v);
+  for (const e of input.employees) {
+    const months = monthsCovered(period, e.hireDate);
+    const salary = (Number(e.baseSalary) || 0) * months;
+    const declared = Number(e.declaredSalary);
+    const charge =
+      e.insured && e.declaredSalary != null && Number.isFinite(declared)
+        ? declared * EMPLOYER_CHARGE_RATE * months
+        : 0;
+    if (salary + charge <= 0) continue;
+
+    const ref = employeeRef(companyId, e.empNumber);
+    const lines = [...perEmployee.values()].filter((l) => l.employeeRef === ref);
+    const total = lines.reduce((a, l) => a + l.minutes, 0);
+    if (total === 0) {
+      // No hours in the period: the cost belongs to no station
+      const line = perEmployee.get(`${ref}|null`) ?? {
+        employeeRef: ref,
+        stationCode: null,
+        minutes: 0,
+      };
+      perEmployee.set(`${ref}|null`, line);
+      lines.push(line);
+    }
+    for (const line of lines) {
+      const share = total === 0 ? 1 : line.minutes / total;
+      add(salaries, line.stationCode, salary * share);
+      add(charges, line.stationCode, charge * share);
+      line.cost = (line.cost ?? 0) + (salary + charge) * share;
+    }
+  }
+
   // ── Output ───────────────────────────────────────────────────────────
   const names = new Map(input.tasks.map((t) => [String(t.taskId), t.taskName]));
   const byCode = (
@@ -230,6 +315,8 @@ export function buildLaborSummary(input: LaborSummaryInput) {
     ...plannedPeople.keys(),
     ...regular.keys(),
     ...overtime.keys(),
+    ...salaries.keys(),
+    ...charges.keys(),
   ]);
   const periodTotals = [...used]
     .map((code) => ({
@@ -240,6 +327,11 @@ export function buildLaborSummary(input: LaborSummaryInput) {
       regularHours: hours(regular.get(code) ?? 0),
       overtimeHours: hours(overtime.get(code) ?? 0),
       plannedHours: hours(plannedMinutes.get(code) ?? 0),
+      baseSalaries: round2(salaries.get(code) ?? 0),
+      employerCharges: round2(charges.get(code) ?? 0),
+      totalLaborCost: round2(
+        (salaries.get(code) ?? 0) + (charges.get(code) ?? 0),
+      ),
     }))
     .sort(byCode);
 
@@ -253,6 +345,7 @@ export function buildLaborSummary(input: LaborSummaryInput) {
       version: LABOR_SUMMARY_VERSION,
       period,
       currency: input.currency,
+      employerChargeRate: EMPLOYER_CHARGE_RATE,
       stations: [...input.tasks]
         .sort((a, b) => a.taskId - b.taskId)
         // A task is either there or deleted: every listed one is active
@@ -273,6 +366,14 @@ export function buildLaborSummary(input: LaborSummaryInput) {
       ),
       advancesPaid: round2(
         input.advances.reduce((a, b) => a + (Number(b.amount) || 0), 0),
+      ),
+      baseSalaries: round2(sum(salaries)),
+      employerCharges: round2(sum(charges)),
+      // Bonuses only exist for the whole site, so only this total has them
+      totalLaborCost: round2(
+        sum(salaries) +
+          sum(charges) +
+          input.bonuses.reduce((a, b) => a + (Number(b.amount) || 0), 0),
       ),
     },
     periodTotals,
@@ -298,6 +399,7 @@ export function buildLaborSummary(input: LaborSummaryInput) {
         employeeRef: l.employeeRef,
         stationCode: l.stationCode,
         hoursWorked: hours(l.minutes),
+        laborCost: round2(l.cost ?? 0),
       })),
   };
 }

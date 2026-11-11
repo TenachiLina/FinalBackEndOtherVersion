@@ -69,7 +69,18 @@ export class ReportsService {
       advances,
     ] = await Promise.all([
       this.companiesService.findById(companyId),
-      this.employeeModel.find({}, { empNumber: 1 }).lean(),
+      this.employeeModel
+        .find(
+          {},
+          {
+            empNumber: 1,
+            baseSalary: 1,
+            insured: 1,
+            declaredSalary: 1,
+            hireDate: 1,
+          },
+        )
+        .lean(),
       this.taskModel.find({}, { taskId: 1, taskName: 1 }).lean(),
       this.shiftModel.find({}, { startTime: 1, endTime: 1 }).lean(),
       this.planningModel.find({ planDate: dates }).lean(),

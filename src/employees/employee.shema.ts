@@ -20,7 +20,11 @@ export class Employee {
   // "YYYY-MM-DD"
   @Prop({ trim: true }) birthDate?: string;
   @Prop({ trim: true }) hireDate?: string;
+  // Also the insurance number (numéro d'assurance)
   @Prop({ trim: true }) socialSecurityNumber?: string;
+  // Declared to social security; the payslip uses declaredSalary when it is set
+  @Prop() insured?: boolean;
+  @Prop({ type: Number }) declaredSalary?: number | null;
 }
 
 export const EmployeeSchema = SchemaFactory.createForClass(Employee);
