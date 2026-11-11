@@ -233,6 +233,10 @@ const EXACT: Record<string, Tr> = {
     fr: 'Choisissez le mois à copier et le mois de destination',
     ar: 'اختر الشهر المراد نسخه والشهر المراد النسخ إليه',
   },
+  'Choose the month and the weekday to delete': {
+    fr: 'Choisissez le mois et le jour de la semaine à supprimer',
+    ar: 'اختر الشهر ويوم الأسبوع المراد حذفه',
+  },
   'Invalid planning date': {
     fr: 'Date de planning invalide',
     ar: 'تاريخ التخطيط غير صالح',

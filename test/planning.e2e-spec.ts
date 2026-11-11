@@ -464,6 +464,110 @@ describe('copying a month (POST /planning/copy-month)', () => {
   });
 });
 
+describe('deleting a weekday of a month (DELETE /planning/weekday)', () => {
+  const del = (admin: any, qs: string) => admin.delete(`/planning/weekday?${qs}`);
+  const left = async (admin: any) => names(await admin.get('/planning'));
+
+  it('deletes every Thursday of the month and keeps the other weekdays and months', async () => {
+    const { admin, morning, ali, sara, omar, plan } = await setup();
+    await plan(ali, morning, '2026-10-01');  // Thu  → deleted
+    await plan(sara, morning, '2026-10-22'); // Thu  → deleted
+    await plan(omar, morning, '2026-10-02'); // Fri  → kept
+    await plan(ali, morning, '2026-11-05');  // Thu in November → kept
+    await plan(ali, morning, '2026-09-24');  // Thu in September → kept
+
+    const res = await del(admin, 'year=2026&month=10&weekday=4');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ deletedCount: 2 });
+    expect(await left(admin)).toEqual(
+      ['Omar@2026-10-02', 'Ali@2026-11-05', 'Ali@2026-09-24'].sort(),
+    );
+  });
+
+  it('deletes all the entries of those days, not just the first one', async () => {
+    const { admin, morning, evening, ali, sara, plan } = await setup();
+    await plan(ali, morning, '2026-10-01');
+    await plan(sara, morning, '2026-10-01');
+    await plan(ali, evening, '2026-10-01');
+
+    const res = await del(admin, 'year=2026&month=10&weekday=4');
+
+    expect(res.body.deletedCount).toBe(3);
+    expect(await left(admin)).toEqual([]);
+  });
+
+  it('stops at the month boundaries', async () => {
+    const { admin, morning, ali, sara, omar, plan } = await setup();
+    await plan(ali, morning, '2026-11-01');  // Sun, first day of Nov → deleted
+    await plan(sara, morning, '2026-10-25'); // Sun, last Sunday of Oct → kept
+    await plan(omar, morning, '2026-12-06'); // Sun, first Sunday of Dec → kept
+
+    const res = await del(admin, 'year=2026&month=11&weekday=0');
+
+    expect(res.body.deletedCount).toBe(1);
+    expect(await left(admin)).toEqual(['Sara@2026-10-25', 'Omar@2026-12-06'].sort());
+  });
+
+  it('gives the same result whatever the time zone of the server', async () => {
+    const { admin, morning, ali, plan } = await setup();
+    await plan(ali, morning, '2026-10-01');
+
+    await withTimeZone('America/New_York', async () => {
+      const res = await del(admin, 'year=2026&month=10&weekday=4');
+      expect(res.body.deletedCount).toBe(1);
+    });
+  });
+
+  it('answers 200 with 0 when there is nothing to delete', async () => {
+    const { admin, morning, ali, plan } = await setup();
+    await plan(ali, morning, '2026-10-02'); // Friday
+
+    const res = await del(admin, 'year=2026&month=10&weekday=4');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ deletedCount: 0 });
+    expect(await left(admin)).toEqual(['Ali@2026-10-02']);
+  });
+
+  it("never touches another company's planning", async () => {
+    const mine = await setup();
+    const other = await setup();
+    await mine.plan(mine.ali, mine.morning, '2026-10-01');
+    await other.plan(other.ali, other.morning, '2026-10-01');
+
+    const res = await del(mine.admin, 'year=2026&month=10&weekday=4');
+
+    expect(res.body.deletedCount).toBe(1);
+    expect(await left(other.admin)).toEqual(['Ali@2026-10-01']);
+  });
+
+  it('is not mistaken for DELETE /planning/:id', async () => {
+    const { admin } = await setup();
+    const res = await del(admin, 'year=2026&month=10&weekday=4');
+    expect(res.status).not.toBe(404);
+  });
+
+  it.each([
+    ['nothing', ''],
+    ['no weekday', 'year=2026&month=10'],
+    ['an empty weekday', 'year=2026&month=10&weekday='],
+    ['a weekday above 6', 'year=2026&month=10&weekday=7'],
+    ['a month that does not exist', 'year=2026&month=13&weekday=4'],
+    ['a year that is not a year', 'year=abc&month=10&weekday=4'],
+  ])('refuses %s, and changes nothing', async (_name, qs) => {
+    const { admin, morning, ali, plan } = await setup();
+    await plan(ali, morning, '2026-10-01');
+
+    const res = await del(admin, qs);
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toBe('Choose the month and the weekday to delete');
+    expect(await left(admin)).toEqual(['Ali@2026-10-01']);
+  });
+});
+
+
 describe('exports', () => {
   /** Sara and Omar in the first week of October 2026, Ali outside it. */
   async function firstWeek() {

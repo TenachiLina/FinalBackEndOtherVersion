@@ -10,6 +10,7 @@ describe('actionFor', () => {
     expect(actionFor('POST', '/employees', {})).toBe('employee.create');
     expect(actionFor('DELETE', '/shifts/:id', {})).toBe('shift.delete');
     expect(actionFor('POST', '/planning/bulk', {})).toBe('planning.saveDay');
+    expect(actionFor('DELETE', '/planning/weekday', {})).toBe('planning.deleteWeekday');
   });
 
   it('tells clock-in from clock-out on the kiosk', () => {

@@ -166,6 +166,16 @@ export class PlanningController {
     return this.planningService.update(id, body);
   }
 
+  /** Delete every same weekday of a month, e.g. all Thursdays of 2026-12 */
+  @Delete('weekday')
+  removeWeekdayOfMonth(
+    @Query('year') year: string,
+    @Query('month') month: string,
+    @Query('weekday') weekday: string,
+  ) {
+    return this.planningService.removeWeekdayOfMonth(year, month, weekday);
+  }
+  
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.planningService.remove(id);
