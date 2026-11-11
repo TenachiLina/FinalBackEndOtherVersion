@@ -17,12 +17,17 @@ import { createHash } from 'crypto';
 // stations by the hours they worked there; with no hours, they go to
 // stationCode null.
 //
+// Absences: an absence counts for the length of the shift the employee was
+// planned on that day, at that shift's station; with no planned shift, for
+// the company's hours per day, at stationCode null. It is justified when
+// its comment (absent_comment) is not empty.
+//
 // Not included yet (the data doesn't exist): new hires, departures,
-// absence hours, overtime pay and contract type. Bonuses and advances are
-// per employee, so they are only given for the whole site.
+// overtime pay and contract type. Bonuses and advances are per employee,
+// so they are only given for the whole site.
 // ─────────────────────────────────────────────────────────────────────────
 
-export const LABOR_SUMMARY_VERSION = '2';
+export const LABOR_SUMMARY_VERSION = '3';
 
 /** Social security on the declared salary: the employee's 9% + the employer's 25% */
 export const EMPLOYER_CHARGE_RATE = 0.34;
@@ -36,6 +41,8 @@ export interface LaborSummaryInput {
   period: Period;
   companyId: string;
   currency: string;
+  /** Length of an absence with no planned shift (company settings) */
+  hoursPerDay?: number;
   employees: {
     _id: unknown;
     empNumber: number;
@@ -63,6 +70,7 @@ export interface LaborSummaryInput {
     work_hours?: string;
     overtime_minutes?: string;
     absent?: boolean;
+    absent_comment?: string;
   }[];
   bonuses: { amount: number }[];
   advances: { amount: number }[];
@@ -105,8 +113,7 @@ function employeeRef(companyId: string, empNumber: number | string): string {
  */
 export function monthsCovered(period: Period, from?: string): number {
   const valid = (d?: string) => !!d && /^\d{4}-\d{2}-\d{2}$/.test(d);
-  const start =
-    valid(from) && from! > period.start ? from! : period.start;
+  const start = valid(from) && from! > period.start ? from! : period.start;
   if (start > period.end) return 0;
   const utc = (d: string) => Date.parse(`${d}T00:00:00Z`);
   const end = utc(period.end);
@@ -150,8 +157,9 @@ export function buildLaborSummary(input: LaborSummaryInput) {
     }
   >();
   // employee number + day -> the entries they are planned on (or backup for)
-  const planned = new Map<string, { shiftId: string; station: string }[]>();
-  const backups = new Map<string, { shiftId: string; station: string }[]>();
+  type Entry = { shiftId: string; station: string; minutes: number };
+  const planned = new Map<string, Entry[]>();
+  const backups = new Map<string, Entry[]>();
   const push = <T>(map: Map<string, T[]>, key: string, value: T) =>
     map.set(key, [...(map.get(key) ?? []), value]);
 
@@ -165,11 +173,9 @@ export function buildLaborSummary(input: LaborSummaryInput) {
     if (!plannedPeople.has(station)) plannedPeople.set(station, new Set());
     plannedPeople.get(station)!.add(refOf(String(p.empId)));
 
+    const minutes = start && end ? slotMinutes(start, end) : 0;
     if (start && end) {
-      plannedMinutes.set(
-        station,
-        (plannedMinutes.get(station) ?? 0) + slotMinutes(start, end),
-      );
+      plannedMinutes.set(station, (plannedMinutes.get(station) ?? 0) + minutes);
       const key = `${date}|${station}|${start}|${end}`;
       const slot = slots.get(key) ?? {
         date,
@@ -182,7 +188,7 @@ export function buildLaborSummary(input: LaborSummaryInput) {
       slots.set(key, slot);
     }
 
-    const entry = { shiftId: String(p.shiftId), station };
+    const entry = { shiftId: String(p.shiftId), station, minutes };
     const empNumber = empNumberById.get(String(p.empId));
     if (empNumber !== undefined) push(planned, `${empNumber}|${date}`, entry);
     for (const b of new Set([...(p.backupEmpIds ?? []), p.backupEmpId ?? ''])) {
@@ -191,19 +197,28 @@ export function buildLaborSummary(input: LaborSummaryInput) {
     }
   }
 
-  /** The station a work time record belongs to, or null when none fits */
-  const stationOf = (empNumber: number, date: string, shiftId?: string) => {
+  /** The planning entry a work time record belongs to, or null when none fits */
+  const entryOf = (
+    empNumber: number,
+    date: string,
+    shiftId?: string,
+  ): Entry | null => {
     const key = `${empNumber}|${date}`;
     for (const list of [planned.get(key) ?? [], backups.get(key) ?? []]) {
       if (shiftId) {
         const match = list.find((e) => e.shiftId === String(shiftId));
-        if (match) return match.station;
+        if (match) return match;
       } else if (list.length === 1) {
-        return list[0].station;
+        return list[0];
       }
     }
     return null;
   };
+
+  // ── Absences ─────────────────────────────────────────────────────────
+  const justified = new Map<StationCode, number>();
+  const unjustified = new Map<StationCode, number>();
+  const dayMinutes = (Number(input.hoursPerDay) || 8) * 60;
 
   // ── Worked ───────────────────────────────────────────────────────────
   const regular = new Map<StationCode, number>();
@@ -228,15 +243,24 @@ export function buildLaborSummary(input: LaborSummaryInput) {
   >();
 
   for (const w of input.worktime) {
-    if (w.absent || !w.work_date) continue;
+    if (!w.work_date) continue;
+    const date = day(new Date(w.work_date));
+    const entry = entryOf(w.emp_id, date, w.shift_id);
+    const station = entry?.station ?? null;
+
+    if (w.absent) {
+      const map = (w.absent_comment ?? '').trim() ? justified : unjustified;
+      const minutes = entry ? entry.minutes : dayMinutes;
+      map.set(station, (map.get(station) ?? 0) + minutes);
+      continue;
+    }
+
     const worked = toMinutes(w.work_hours);
     if (worked <= 0) continue;
     const extra = Math.min(
       Math.max(Number(w.overtime_minutes) || 0, 0),
       worked,
     );
-    const date = day(new Date(w.work_date));
-    const station = stationOf(w.emp_id, date, w.shift_id);
 
     regular.set(station, (regular.get(station) ?? 0) + worked - extra);
     overtime.set(station, (overtime.get(station) ?? 0) + extra);
@@ -279,7 +303,9 @@ export function buildLaborSummary(input: LaborSummaryInput) {
     if (salary + charge <= 0) continue;
 
     const ref = employeeRef(companyId, e.empNumber);
-    const lines = [...perEmployee.values()].filter((l) => l.employeeRef === ref);
+    const lines = [...perEmployee.values()].filter(
+      (l) => l.employeeRef === ref,
+    );
     const total = lines.reduce((a, l) => a + l.minutes, 0);
     if (total === 0) {
       // No hours in the period: the cost belongs to no station
@@ -317,6 +343,8 @@ export function buildLaborSummary(input: LaborSummaryInput) {
     ...overtime.keys(),
     ...salaries.keys(),
     ...charges.keys(),
+    ...justified.keys(),
+    ...unjustified.keys(),
   ]);
   const periodTotals = [...used]
     .map((code) => ({
@@ -327,6 +355,8 @@ export function buildLaborSummary(input: LaborSummaryInput) {
       regularHours: hours(regular.get(code) ?? 0),
       overtimeHours: hours(overtime.get(code) ?? 0),
       plannedHours: hours(plannedMinutes.get(code) ?? 0),
+      justifiedAbsenceHours: hours(justified.get(code) ?? 0),
+      unjustifiedAbsenceHours: hours(unjustified.get(code) ?? 0),
       baseSalaries: round2(salaries.get(code) ?? 0),
       employerCharges: round2(charges.get(code) ?? 0),
       totalLaborCost: round2(
@@ -361,6 +391,8 @@ export function buildLaborSummary(input: LaborSummaryInput) {
       regularHours: hours(sum(regular)),
       overtimeHours: hours(sum(overtime)),
       plannedHours: hours(sum(plannedMinutes)),
+      justifiedAbsenceHours: hours(sum(justified)),
+      unjustifiedAbsenceHours: hours(sum(unjustified)),
       bonuses: round2(
         input.bonuses.reduce((a, b) => a + (Number(b.amount) || 0), 0),
       ),

@@ -95,6 +95,7 @@ export class ReportsService {
       period,
       companyId,
       currency: company?.settings?.currency ?? 'DA',
+      hoursPerDay: company?.settings?.hoursPerDay,
       employees,
       tasks,
       shifts,
