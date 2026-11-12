@@ -175,7 +175,16 @@ export class PlanningController {
   ) {
     return this.planningService.removeWeekdayOfMonth(year, month, weekday);
   }
-  
+
+  /**
+   * Delete the whole planning of a month, e.g. 2026-12.
+   * Refused (409) for the current month and for months with clock-ins/outs.
+   */
+  @Delete('month')
+  removeMonth(@Query('year') year: string, @Query('month') month: string) {
+    return this.planningService.removeMonth(year, month);
+  }
+
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.planningService.remove(id);

@@ -1,7 +1,22 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Planning, PlanningDocument } from './planning.shema';
+import { Worktime, WorktimeDocument } from '../worktime/worktime.shema';
+import { RawAttendanceLog, RawAttendanceLogDocument } from '../attendance/raw-attendance-log.schema';
+import {
+  ZktecoAttendanceEvent,
+  ZktecoAttendanceEventDocument,
+} from '../zkteco/schemas/zkteco-attendance-event.schema';
+import {
+  clockingRange,
+  compareMonths,
+  currentMonthInAlgiers,
+  MONTH_DELETE_MESSAGES,
+  parseYearMonth,
+  planningRange,
+  type YearMonth,
+} from './delete-month.util';
 import * as ExcelJS from "exceljs";
 import { Response } from "express";
 import { getBackupIds, getBackupEmployees } from './backups.util';
@@ -11,7 +26,14 @@ const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 @Injectable()
 export class PlanningService {
-  constructor(@InjectModel(Planning.name) private planningModel: Model<PlanningDocument>) {}
+  constructor(
+    @InjectModel(Planning.name) private planningModel: Model<PlanningDocument>,
+    @InjectModel(Worktime.name) private worktimeModel: Model<WorktimeDocument>,
+    @InjectModel(RawAttendanceLog.name)
+    private rawAttendanceModel: Model<RawAttendanceLogDocument>,
+    @InjectModel(ZktecoAttendanceEvent.name)
+    private zktecoEventModel: Model<ZktecoAttendanceEventDocument>,
+  ) {}
 
   async create(data: Partial<Planning>): Promise<PlanningDocument> {
     return this.planningModel.create(data);
@@ -2140,6 +2162,57 @@ private async buildDayPlanning(
       });
 
       return { deletedCount: result.deletedCount ?? 0 };
+    }
+
+    /**
+     * Deletes the planning of a whole month, e.g. all of December 2026.
+     * Refused for the current month, and for any month that already has
+     * clock-ins or clock-outs (see delete-month.util.ts).
+     */
+    async removeMonth(
+      year: string,
+      month: string,
+      now: Date = new Date(),
+    ): Promise<{ deletedCount: number }> {
+      const target = parseYearMonth(year, month);
+      if (!target) throw new BadRequestException(MONTH_DELETE_MESSAGES.invalid);
+
+      if (compareMonths(target, currentMonthInAlgiers(now)) === 0) {
+        throw new ConflictException(MONTH_DELETE_MESSAGES.current);
+      }
+
+      if (await this.monthHasClocking(target)) {
+        throw new ConflictException(MONTH_DELETE_MESSAGES.clocked);
+      }
+
+      const { start, end } = planningRange(target);
+      const result = await this.planningModel.deleteMany({
+        planDate: { $gte: start, $lt: end },
+      });
+      return { deletedCount: result.deletedCount ?? 0 };
+    }
+
+    /**
+     * True when the month has any attendance: a worked day with a clock-in,
+     * a clock-out or a recorded absence, or a punch from a machine that may
+     * not have been turned into a worked day yet.
+     */
+    private async monthHasClocking(target: YearMonth): Promise<boolean> {
+      const { start, end } = clockingRange(target);
+      const inMonth = { $gte: start, $lt: end };
+      const [worked, raw, zkteco] = await Promise.all([
+        this.worktimeModel.exists({
+          work_date: inMonth,
+          $or: [
+            { clock_in: { $nin: [null, ''] } },
+            { clock_out: { $nin: [null, ''] } },
+            { absent: true },
+          ],
+        }),
+        this.rawAttendanceModel.exists({ timestamp: inMonth }),
+        this.zktecoEventModel.exists({ eventTime: inMonth }),
+      ]);
+      return Boolean(worked || raw || zkteco);
     }
 
     async copyMonth(

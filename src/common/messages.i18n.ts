@@ -237,6 +237,18 @@ const EXACT: Record<string, Tr> = {
     fr: 'Choisissez le mois et le jour de la semaine à supprimer',
     ar: 'اختر الشهر ويوم الأسبوع المراد حذفه',
   },
+  'Choose the month to delete': {
+    fr: 'Choisissez le mois à supprimer',
+    ar: 'اختر الشهر المراد حذفه',
+  },
+  "The current month's planning cannot be deleted": {
+    fr: 'Le planning du mois en cours ne peut pas être supprimé',
+    ar: 'لا يمكن حذف تخطيط الشهر الحالي',
+  },
+  'This month already has clock-ins or clock-outs: its planning cannot be deleted': {
+    fr: 'Ce mois contient déjà des pointages : son planning ne peut pas être supprimé',
+    ar: 'يحتوي هذا الشهر على تسجيلات دخول أو خروج: لا يمكن حذف تخطيطه',
+  },
   'Invalid planning date': {
     fr: 'Date de planning invalide',
     ar: 'تاريخ التخطيط غير صالح',
