@@ -47,6 +47,8 @@ const ACTIONS: Record<string, string> = {
   'POST /planning/copy-month': 'planning.copyMonth',
   'PUT /planning/:id': 'planning.update',
   'DELETE /planning/:id': 'planning.delete',
+  'DELETE /planning/weekday': 'planning.deleteWeekday',
+  'DELETE /planning/month': 'planning.deleteMonth',
 
   'POST /worktime': 'worktime.create',
   'PUT /worktime/:id': 'worktime.update',

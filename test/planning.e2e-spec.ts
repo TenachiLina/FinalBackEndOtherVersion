@@ -1,7 +1,7 @@
 import { createTestApp, type TestApp } from './helpers/app';
 import { loginAs, seeder, unknownId } from './helpers/seed';
 import { runForCompany } from '../src/tenancy/tenant-context';
-import { withTimeZone } from './helpers/time';
+import { setNow, withTimeZone } from './helpers/time';
 import { download, excelRows, pdfPages, pdfText } from './helpers/files';
 
 // The planning: who works which shift and post on which day, saving a day,
@@ -463,6 +463,359 @@ describe('copying a month (POST /planning/copy-month)', () => {
     ).toHaveLength(1);
   });
 });
+
+describe('deleting a weekday of a month (DELETE /planning/weekday)', () => {
+  const del = (admin: any, qs: string) => admin.delete(`/planning/weekday?${qs}`);
+  const left = async (admin: any) => names(await admin.get('/planning'));
+
+  it('deletes every Thursday of the month and keeps the other weekdays and months', async () => {
+    const { admin, morning, ali, sara, omar, plan } = await setup();
+    await plan(ali, morning, '2026-10-01');  // Thu  → deleted
+    await plan(sara, morning, '2026-10-22'); // Thu  → deleted
+    await plan(omar, morning, '2026-10-02'); // Fri  → kept
+    await plan(ali, morning, '2026-11-05');  // Thu in November → kept
+    await plan(ali, morning, '2026-09-24');  // Thu in September → kept
+
+    const res = await del(admin, 'year=2026&month=10&weekday=4');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ deletedCount: 2 });
+    expect(await left(admin)).toEqual(
+      ['Omar@2026-10-02', 'Ali@2026-11-05', 'Ali@2026-09-24'].sort(),
+    );
+  });
+
+  it('deletes all the entries of those days, not just the first one', async () => {
+    const { admin, morning, evening, ali, sara, plan } = await setup();
+    await plan(ali, morning, '2026-10-01');
+    await plan(sara, morning, '2026-10-01');
+    await plan(ali, evening, '2026-10-01');
+
+    const res = await del(admin, 'year=2026&month=10&weekday=4');
+
+    expect(res.body.deletedCount).toBe(3);
+    expect(await left(admin)).toEqual([]);
+  });
+
+  it('stops at the month boundaries', async () => {
+    const { admin, morning, ali, sara, omar, plan } = await setup();
+    await plan(ali, morning, '2026-11-01');  // Sun, first day of Nov → deleted
+    await plan(sara, morning, '2026-10-25'); // Sun, last Sunday of Oct → kept
+    await plan(omar, morning, '2026-12-06'); // Sun, first Sunday of Dec → kept
+
+    const res = await del(admin, 'year=2026&month=11&weekday=0');
+
+    expect(res.body.deletedCount).toBe(1);
+    expect(await left(admin)).toEqual(['Sara@2026-10-25', 'Omar@2026-12-06'].sort());
+  });
+
+  it('gives the same result whatever the time zone of the server', async () => {
+    const { admin, morning, ali, plan } = await setup();
+    await plan(ali, morning, '2026-10-01');
+
+    await withTimeZone('America/New_York', async () => {
+      const res = await del(admin, 'year=2026&month=10&weekday=4');
+      expect(res.body.deletedCount).toBe(1);
+    });
+  });
+
+  it('answers 200 with 0 when there is nothing to delete', async () => {
+    const { admin, morning, ali, plan } = await setup();
+    await plan(ali, morning, '2026-10-02'); // Friday
+
+    const res = await del(admin, 'year=2026&month=10&weekday=4');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ deletedCount: 0 });
+    expect(await left(admin)).toEqual(['Ali@2026-10-02']);
+  });
+
+  it("never touches another company's planning", async () => {
+    const mine = await setup();
+    const other = await setup();
+    await mine.plan(mine.ali, mine.morning, '2026-10-01');
+    await other.plan(other.ali, other.morning, '2026-10-01');
+
+    const res = await del(mine.admin, 'year=2026&month=10&weekday=4');
+
+    expect(res.body.deletedCount).toBe(1);
+    expect(await left(other.admin)).toEqual(['Ali@2026-10-01']);
+  });
+
+  it('is not mistaken for DELETE /planning/:id', async () => {
+    const { admin } = await setup();
+    const res = await del(admin, 'year=2026&month=10&weekday=4');
+    expect(res.status).not.toBe(404);
+  });
+
+  it.each([
+    ['nothing', ''],
+    ['no weekday', 'year=2026&month=10'],
+    ['an empty weekday', 'year=2026&month=10&weekday='],
+    ['a weekday above 6', 'year=2026&month=10&weekday=7'],
+    ['a month that does not exist', 'year=2026&month=13&weekday=4'],
+    ['a year that is not a year', 'year=abc&month=10&weekday=4'],
+  ])('refuses %s, and changes nothing', async (_name, qs) => {
+    const { admin, morning, ali, plan } = await setup();
+    await plan(ali, morning, '2026-10-01');
+
+    const res = await del(admin, qs);
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toBe('Choose the month and the weekday to delete');
+    expect(await left(admin)).toEqual(['Ali@2026-10-01']);
+  });
+});
+
+describe('deleting a whole month (DELETE /planning/month)', () => {
+  // "Today" is 12 November 2026: November is the current month,
+  // October and September are past, December is next.
+  const NOW = '2026-11-12T10:00:00Z';
+  const del = (admin: any, qs: string) => admin.delete(`/planning/month?${qs}`);
+  const left = async (admin: any) => names(await admin.get('/planning'));
+  const CURRENT = "The current month's planning cannot be deleted";
+  const CLOCKED =
+    'This month already has clock-ins or clock-outs: its planning cannot be deleted';
+
+  // Log in after fixing "now", so the session is not seen as expired
+  beforeEach(() => setNow(NOW));
+  afterEach(() => jest.useRealTimers());
+
+  /** One planned day in each of September, October, November and December. */
+  async function fourMonths() {
+    const s = await setup();
+    await s.plan(s.ali, s.morning, '2026-09-15');
+    await s.plan(s.ali, s.morning, '2026-10-15');
+    await s.plan(s.ali, s.morning, '2026-11-15');
+    await s.plan(s.ali, s.morning, '2026-12-15');
+    return s;
+  }
+  const ALL = ['Ali@2026-09-15', 'Ali@2026-10-15', 'Ali@2026-11-15', 'Ali@2026-12-15'];
+
+  const worked = (s: Awaited<ReturnType<typeof setup>>, fields: object) =>
+    seed.worktime(s.company.id, { emp_id: 1, shift_id: s.id(s.morning), ...fields });
+  const machinePunch = (companyId: string, timestamp: string) =>
+    runForCompany(companyId, async () => {
+      await t.model('RawAttendanceLog').create({
+        deviceUserId: '1',
+        timestamp: new Date(timestamp),
+        deviceLogId: `log-${timestamp}`,
+      });
+    });
+
+  it('deletes every day of a future month, all entries of each day, and nothing else', async () => {
+    const s = await fourMonths();
+    await s.plan(s.sara, s.morning, '2026-12-01'); // first day
+    await s.plan(s.omar, s.evening, '2026-12-31'); // last day
+    await s.plan(s.sara, s.evening, '2026-12-15'); // a second entry on the same day
+    await s.plan(s.omar, s.morning, '2027-01-01'); // first day of the next month → kept
+
+    const res = await del(s.admin, 'year=2026&month=12');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ deletedCount: 4 });
+    expect(await left(s.admin)).toEqual(
+      ['Ali@2026-09-15', 'Ali@2026-10-15', 'Ali@2026-11-15', 'Omar@2027-01-01'].sort(),
+    );
+  });
+
+  it('accepts a month written with a leading zero', async () => {
+    const s = await setup();
+    await s.plan(s.ali, s.morning, '2027-02-10');
+    const res = await del(s.admin, 'year=2027&month=02');
+    expect(res.body).toEqual({ deletedCount: 1 });
+  });
+
+  it('refuses the current month, and deletes nothing', async () => {
+    const s = await fourMonths();
+
+    const res = await del(s.admin, 'year=2026&month=11');
+
+    expect(res.status).toBe(409);
+    expect(res.body.message).toBe(CURRENT);
+    expect(await left(s.admin)).toEqual(ALL);
+  });
+
+  it('refuses the current month even when it has no clock-in yet (its 1st day)', async () => {
+    setNow('2026-11-01T08:00:00Z');
+    const s = await fourMonths();
+    const res = await del(s.admin, 'year=2026&month=11');
+    expect(res.status).toBe(409);
+    expect(await left(s.admin)).toEqual(ALL);
+  });
+
+  it('already treats December as current at 00:30 on 1 December in Algiers (23:30 UTC)', async () => {
+    setNow('2026-11-30T23:30:00Z');
+    const s = await fourMonths();
+
+    const res = await del(s.admin, 'year=2026&month=12');
+
+    expect(res.status).toBe(409);
+    expect(res.body.message).toBe(CURRENT);
+    expect(await left(s.admin)).toEqual(ALL);
+  });
+
+  it('refuses the current month whatever the time zone of the server', async () => {
+    const s = await fourMonths();
+    await withTimeZone('America/New_York', async () => {
+      const res = await del(s.admin, 'year=2026&month=11');
+      expect(res.status).toBe(409);
+    });
+    expect(await left(s.admin)).toEqual(ALL);
+  });
+
+  it('deletes a past month that has no clock-in or clock-out', async () => {
+    const s = await fourMonths();
+    const res = await del(s.admin, 'year=2026&month=9');
+    expect(res.body).toEqual({ deletedCount: 1 });
+    expect(await left(s.admin)).toEqual(ALL.filter((n) => !n.includes('2026-09')));
+  });
+
+  it.each([
+    ['a clock-in', { clock_in: '08:02' }],
+    ['a clock-out only', { clock_out: '16:05' }],
+    ['a clock-in at midnight ("00:00" is a real time)', { clock_in: '00:00' }],
+    ['a recorded absence', { absent: true, absent_comment: 'Sick' }],
+  ])('refuses a past month with %s, and deletes nothing', async (_name, fields) => {
+    const s = await fourMonths();
+    await worked(s, { work_date: new Date('2026-10-20T00:00:00'), ...fields });
+
+    const res = await del(s.admin, 'year=2026&month=10');
+
+    expect(res.status).toBe(409);
+    expect(res.body.message).toBe(CLOCKED);
+    expect(await left(s.admin)).toEqual(ALL);
+  });
+
+  it('refuses a month whose worked day is saved at local midnight in Algiers', async () => {
+    const s = await fourMonths();
+    await withTimeZone('Africa/Algiers', async () => {
+      // new Date('2026-10-01T00:00:00') in Algiers = 30 September 23:00 UTC
+      await worked(s, { work_date: new Date('2026-10-01T00:00:00'), clock_in: '08:00' });
+      const res = await del(s.admin, 'year=2026&month=10');
+      expect(res.status).toBe(409);
+      // ...and it does not belong to September
+      expect((await del(s.admin, 'year=2026&month=9')).status).toBe(200);
+    });
+  });
+
+  it('refuses a month with a machine punch not yet turned into a worked day', async () => {
+    const s = await fourMonths();
+    await machinePunch(s.company.id, '2026-10-20T07:58:00Z');
+
+    const res = await del(s.admin, 'year=2026&month=10');
+
+    expect(res.status).toBe(409);
+    expect(res.body.message).toBe(CLOCKED);
+    expect(await left(s.admin)).toEqual(ALL);
+  });
+
+  it('counts a punch at 00:30 in Algiers on the 1st (23:30 UTC the day before) in its month', async () => {
+    const s = await fourMonths();
+    await machinePunch(s.company.id, '2026-09-30T23:30:00Z'); // 1 October 00:30 in Algiers
+    expect((await del(s.admin, 'year=2026&month=10')).status).toBe(409);
+  });
+
+  it('refuses a month with a punch received from a ZKTeco machine', async () => {
+    const s = await fourMonths();
+    await runForCompany(s.company.id, async () => {
+      await t.model('ZktecoAttendanceEvent').create({
+        deviceSerial: 'SN1',
+        employeePin: '1',
+        eventTime: new Date('2026-10-20T07:58:00Z'),
+        deviceTimestamp: '2026-10-20 08:58:00',
+        status: 0,
+        verifyMode: 1,
+        rawLine: '1\t2026-10-20 08:58:00\t0\t1',
+        eventKey: `SN1-1-${Date.now()}-${Math.random()}`,
+      });
+    });
+
+    const res = await del(s.admin, 'year=2026&month=10');
+
+    expect(res.status).toBe(409);
+    expect(await left(s.admin)).toEqual(ALL);
+  });
+
+  it('also refuses a future month that somehow already has clock-ins', async () => {
+    const s = await fourMonths();
+    await worked(s, { work_date: new Date('2026-12-03T00:00:00'), clock_in: '08:00' });
+    const res = await del(s.admin, 'year=2026&month=12');
+    expect(res.status).toBe(409);
+    expect(await left(s.admin)).toEqual(ALL);
+  });
+
+  it('is not stopped by worked days without any clocking (empty, or "" times)', async () => {
+    const s = await fourMonths();
+    await worked(s, { work_date: new Date('2026-09-10T00:00:00') });
+    await worked(s, {
+      work_date: new Date('2026-09-11T00:00:00'),
+      clock_in: '',
+      clock_out: null,
+      absent: false,
+    });
+    const res = await del(s.admin, 'year=2026&month=9');
+    expect(res.body).toEqual({ deletedCount: 1 });
+  });
+
+  it('is not stopped by clock-ins of the months around it', async () => {
+    const s = await fourMonths();
+    await worked(s, { work_date: new Date('2026-08-31T00:00:00'), clock_in: '08:00' });
+    await worked(s, { work_date: new Date('2026-10-01T00:00:00'), clock_in: '08:00' });
+    await machinePunch(s.company.id, '2026-08-31T12:00:00Z');
+    await machinePunch(s.company.id, '2026-10-02T12:00:00Z');
+
+    const res = await del(s.admin, 'year=2026&month=9');
+
+    expect(res.body).toEqual({ deletedCount: 1 });
+  });
+
+  it("is not stopped by another company's clock-ins, and never deletes its planning", async () => {
+    const mine = await fourMonths();
+    const other = await fourMonths();
+    await worked(other, { work_date: new Date('2026-09-10T00:00:00'), clock_in: '08:00' });
+    await machinePunch(other.company.id, '2026-09-10T07:00:00Z');
+
+    const res = await del(mine.admin, 'year=2026&month=9');
+
+    expect(res.body).toEqual({ deletedCount: 1 });
+    expect(await left(other.admin)).toEqual(ALL);
+  });
+
+  it('answers 200 with 0 when the month has no planning', async () => {
+    const s = await fourMonths();
+    const res = await del(s.admin, 'year=2027&month=3');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ deletedCount: 0 });
+    expect(await left(s.admin)).toEqual(ALL);
+  });
+
+  it('is not mistaken for DELETE /planning/:id', async () => {
+    const { admin } = await setup();
+    const res = await del(admin, 'year=2027&month=3');
+    expect(res.status).toBe(200);
+  });
+
+  it.each([
+    ['nothing', ''],
+    ['no month', 'year=2026'],
+    ['no year', 'month=12'],
+    ['an empty month', 'year=2026&month='],
+    ['a month that does not exist', 'year=2026&month=13'],
+    ['month 0', 'year=2026&month=0'],
+    ['a year that is not a year', 'year=abc&month=12'],
+    ['two months at once', 'year=2026&month=12&month=1'],
+  ])('refuses %s, and deletes nothing', async (_name, qs) => {
+    const s = await fourMonths();
+
+    const res = await del(s.admin, qs);
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toBe('Choose the month to delete');
+    expect(await left(s.admin)).toEqual(ALL);
+  });
+});
+
 
 describe('exports', () => {
   /** Sara and Omar in the first week of October 2026, Ali outside it. */
