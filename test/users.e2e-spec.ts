@@ -85,7 +85,7 @@ describe('POST /users', () => {
       .send(newUser({ role: 'superadmin' }));
     expect(res.status).toBe(400);
     expect(res.body.message).toBe(
-      'Role must be one of: admin, manager, employee',
+      'Role must be one of: admin, manager, employee, staff',
     );
   });
 

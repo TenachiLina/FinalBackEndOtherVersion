@@ -8,14 +8,17 @@ import type { Feature } from '../companies/company.schema';
 // superadmin: the product owner; manages companies and has no company of its own.
 // admin / manager: users inside one company.
 // employee: a shared clock-in kiosk account; can only clock employees in and out.
-export type Role = 'superadmin' | 'admin' | 'manager' | 'employee';
-export const COMPANY_ROLES: Role[] = ['admin', 'manager', 'employee'];
+// staff: one employee's personal account (the mobile app); linked to that
+//   employee's record and can only read its own information (/me routes).
+export type Role = 'superadmin' | 'admin' | 'manager' | 'employee' | 'staff';
+export const COMPANY_ROLES: Role[] = ['admin', 'manager', 'employee', 'staff'];
 
 export const IS_PUBLIC_KEY = 'isPublic';
 export const ROLES_KEY = 'roles';
 export const FEATURE_KEY = 'feature';
 export const NO_COMPANY_KEY = 'noCompany';
 export const KIOSK_KEY = 'kioskAllowed';
+export const STAFF_KEY = 'staffAllowed';
 
 // Skips authentication entirely (login, health check, attendance device).
 export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);
@@ -35,6 +38,10 @@ export const AllowNoCompany = () => SetMetadata(NO_COMPANY_KEY, true);
 
 // Employee (kiosk) accounts may use this route. They are refused everywhere else.
 export const KioskAllowed = () => SetMetadata(KIOSK_KEY, true);
+
+// Personal employee (staff) accounts may use this route. They are refused
+// everywhere else, kiosk routes included.
+export const StaffAllowed = () => SetMetadata(STAFF_KEY, true);
 
 export interface AuthUser {
   id: string;

@@ -12,6 +12,7 @@ import {
   KIOSK_KEY,
   NO_COMPANY_KEY,
   ROLES_KEY,
+  STAFF_KEY,
   type Role,
 } from '../../src/auth/auth.decorators';
 import type { Feature } from '../../src/companies/company.schema';
@@ -25,6 +26,7 @@ export interface RouteInfo {
   roles: Role[];
   feature?: Feature;
   kiosk: boolean;
+  staff: boolean;
   noCompany: boolean;
 }
 
@@ -68,6 +70,7 @@ export function allRoutes(registered: Set<unknown>): RouteInfo[] {
           roles: meta<Role[]>(ROLES_KEY) ?? [],
           feature: meta<Feature>(FEATURE_KEY),
           kiosk: !!meta<boolean>(KIOSK_KEY),
+          staff: !!meta<boolean>(STAFF_KEY),
           noCompany: !!meta<boolean>(NO_COMPANY_KEY),
         });
       }

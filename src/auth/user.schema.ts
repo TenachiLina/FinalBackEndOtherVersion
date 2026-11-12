@@ -17,7 +17,7 @@ export class User {
   @Prop({
     type: String,
     required: true,
-    enum: ['superadmin', 'admin', 'manager', 'employee'],
+    enum: ['superadmin', 'admin', 'manager', 'employee', 'staff'],
     default: 'manager',
   })
   role!: Role;
@@ -32,6 +32,7 @@ export class User {
   @Prop({ default: true }) active!: boolean;
   // For a manager: the employee record that is this person. Other managers
   // don't see that employee on salary pages (see ManagerVisibilityService).
+  // For a staff account: required, the employee whose data the account reads.
   @Prop({
     type: MongooseSchema.Types.ObjectId,
     ref: 'Employee',

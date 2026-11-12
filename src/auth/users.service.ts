@@ -94,14 +94,21 @@ export class UsersService {
     return role as Role;
   }
 
-  // Only managers are linked to an employee; one account per employee.
+  // Managers may be linked to an employee, staff accounts must be; one
+  // account per employee.
   private async validateEmployeeLink(
     employeeId: unknown,
     role: Role,
     companyId: string,
     userId?: string,
   ): Promise<Types.ObjectId | null> {
-    if (role !== 'manager' || employeeId == null || employeeId === '') {
+    const missing = employeeId == null || employeeId === '';
+    if (role === 'staff' && missing) {
+      throw new BadRequestException(
+        'An employee account must be linked to an employee',
+      );
+    }
+    if ((role !== 'manager' && role !== 'staff') || missing) {
       return null;
     }
     const id = String(employeeId);
@@ -166,7 +173,7 @@ export class UsersService {
     }));
   }
 
-  /** Creates a company user (admin or manager). */
+  /** Creates a company user (admin, manager, kiosk or staff). */
   create(companyId: string, input: CreateUserInput) {
     return this.createUser(
       input,

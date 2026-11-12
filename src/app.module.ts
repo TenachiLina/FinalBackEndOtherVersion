@@ -45,6 +45,7 @@ import { AuthModule } from './auth/auth.module';
 import { AuditModule } from './audit/audit.module';
 import { ErrorLogsModule } from './error-logs/error-logs.module';
 import { ReportsModule } from './reports/reports.module';
+import { MeModule } from './me/me.module';
 
 @Module({
   imports: [
@@ -80,6 +81,7 @@ import { ReportsModule } from './reports/reports.module';
     AuditModule,
     ErrorLogsModule,
     ReportsModule,
+    MeModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

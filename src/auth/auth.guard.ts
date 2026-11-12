@@ -15,6 +15,7 @@ import {
   KIOSK_KEY,
   NO_COMPANY_KEY,
   ROLES_KEY,
+  STAFF_KEY,
 } from './auth.decorators';
 import type { AuthUser, Role } from './auth.decorators';
 import { SessionsService } from './sessions.service';
@@ -35,7 +36,8 @@ import { setCurrentCompany } from '../tenancy/tenant-context';
  * 3. works out the company (the user's own, or the one a super admin picked
  *    with the X-Company-Id header) and makes all data access use it
  * 4. checks the company is active and has the route's feature switched on
- * 5. checks the user's role
+ * 5. checks the user's role (kiosk and staff accounts only reach the routes
+ *    marked for them)
  */
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -122,6 +124,12 @@ export class AuthGuard implements CanActivate {
     if (user.role === 'employee' && !meta<boolean>(KIOSK_KEY)) {
       throw new ForbiddenException(
         'This account can only clock employees in and out',
+      );
+    }
+    // Personal employee accounts only read their own information.
+    if (user.role === 'staff' && !meta<boolean>(STAFF_KEY)) {
+      throw new ForbiddenException(
+        'This account can only see its own information',
       );
     }
 

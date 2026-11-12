@@ -16,6 +16,7 @@ import {
   CurrentUser,
   KioskAllowed,
   Public,
+  StaffAllowed,
 } from './auth.decorators';
 import type { AuthUser } from './auth.decorators';
 import { clientInfo } from './client-info';
@@ -23,6 +24,7 @@ import { clientInfo } from './client-info';
 // A super admin uses these without picking a company.
 @AllowNoCompany()
 @KioskAllowed()
+@StaffAllowed()
 @Controller('auth')
 export class AuthController {
   constructor(

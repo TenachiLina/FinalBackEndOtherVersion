@@ -16,7 +16,7 @@ let t: TestApp;
 const routes: RouteInfo[] = allRoutes(registeredControllers());
 type Client = Awaited<ReturnType<typeof loginAs>>;
 let as: Record<
-  'admin' | 'manager' | 'kiosk' | 'superadmin' | 'noFeatures',
+  'admin' | 'manager' | 'kiosk' | 'staff' | 'superadmin' | 'noFeatures',
   Client
 >;
 let superInCompany: Client;
@@ -30,6 +30,12 @@ beforeAll(async () => {
     admin: await loginAs(t, await seed.user('admin', company.id)),
     manager: await loginAs(t, await seed.user('manager', company.id)),
     kiosk: await loginAs(t, await seed.user('employee', company.id)),
+    staff: await loginAs(
+      t,
+      await seed.user('staff', company.id, {
+        employeeId: String((await seed.employee(company.id))._id),
+      }),
+    ),
     superadmin: await loginAs(t, await seed.user('superadmin', null)),
     noFeatures: await loginAs(t, await seed.user('admin', bare.id)),
   };
@@ -71,6 +77,16 @@ describe('a kiosk account', () => {
     expect(res.status).toBe(403);
     expect(res.body.message).toBe(
       'This account can only clock employees in and out',
+    );
+  });
+});
+
+describe('an employee (staff) account', () => {
+  it.each(each((r) => !r.staff))('%s → 403', async (_key, r) => {
+    const res = await call(as.staff, r);
+    expect(res.status).toBe(403);
+    expect(res.body.message).toBe(
+      'This account can only see its own information',
     );
   });
 });
@@ -199,6 +215,28 @@ describe('the rules for sensitive routes', () => {
       'POST /error-logs/client',
       'POST /kiosk/clock',
     ]);
+  });
+
+  it('an employee (staff) account reaches only its own account and its own data, read only', () => {
+    const staffRoutes = routes.filter((r) => r.staff && !r.isPublic);
+    expect(
+      staffRoutes.filter((r) => !r.path.startsWith('/auth/')).map((r) => r.key),
+    ).toEqual([
+      'GET /me/advances',
+      'GET /me/bonuses',
+      'GET /me/planning',
+      'GET /me/profile',
+      'GET /me/worktime',
+    ]);
+    // The /me routes are for staff accounts only, and never kiosk routes
+    for (const r of staffRoutes.filter((x) => x.path.startsWith('/me/'))) {
+      expect(r.roles).toEqual(['staff']);
+      expect(r.kiosk).toBe(false);
+    }
+    expect(rule('GET /me/planning').feature).toBe('planning');
+    expect(rule('GET /me/worktime').feature).toBe('clockin');
+    expect(rule('GET /me/advances').feature).toBe('advances');
+    expect(rule('GET /me/bonuses').feature).toBe('bonuses');
   });
 
   it('only sign-in, branding and the clocking machine are public', () => {

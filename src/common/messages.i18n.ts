@@ -93,6 +93,22 @@ const EXACT: Record<string, Tr> = {
     fr: 'Ce compte peut seulement pointer les arrivées et départs',
     ar: 'هذا الحساب مخصص لتسجيل الحضور والانصراف فقط',
   },
+  'This account can only see its own information': {
+    fr: 'Ce compte peut seulement consulter ses propres informations',
+    ar: 'هذا الحساب يمكنه فقط الاطلاع على معلوماته الخاصة',
+  },
+  'An employee account must be linked to an employee': {
+    fr: 'Un compte employé doit être rattaché à un employé',
+    ar: 'يجب ربط حساب الموظف بموظف',
+  },
+  'Your account is not linked to an employee': {
+    fr: "Votre compte n'est rattaché à aucun employé",
+    ar: 'حسابك غير مرتبط بأي موظف',
+  },
+  'year and month are required (e.g. year=2026&month=11)': {
+    fr: 'year et month sont obligatoires (ex. year=2026&month=11)',
+    ar: 'السنة والشهر مطلوبان (مثال: year=2026&month=11)',
+  },
   'Choose a company first': {
     fr: "Choisissez d'abord une entreprise",
     ar: 'اختر شركة أولًا',
