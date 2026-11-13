@@ -269,6 +269,51 @@ const EXACT: Record<string, Tr> = {
     fr: 'Date de planning invalide',
     ar: 'تاريخ التخطيط غير صالح',
   },
+  // correction requests (employees report mistakes from the mobile app)
+  'Choose what the mistake is about: worked time, an advance or a bonus': {
+    fr: "Choisissez l'objet de l'erreur : temps travaillé, avance ou prime",
+    ar: 'اختر موضوع الخطأ: وقت العمل أو سلفة أو مكافأة',
+  },
+  'Describe the mistake in a few words': {
+    fr: "Décrivez l'erreur en quelques mots",
+    ar: 'صف الخطأ في بضع كلمات',
+  },
+  'The message can be at most 500 characters': {
+    fr: 'Le message ne peut pas dépasser 500 caractères',
+    ar: 'لا يمكن أن تتجاوز الرسالة 500 حرف',
+  },
+  'The reply can be at most 500 characters': {
+    fr: 'La réponse ne peut pas dépasser 500 caractères',
+    ar: 'لا يمكن أن يتجاوز الرد 500 حرف',
+  },
+  'Choose Corrected or Rejected': {
+    fr: 'Choisissez Corrigé ou Refusé',
+    ar: 'اختر تم التصحيح أو مرفوض',
+  },
+  'status must be pending, corrected, rejected or all': {
+    fr: 'Le statut doit être pending, corrected, rejected ou all',
+    ar: 'يجب أن تكون الحالة pending أو corrected أو rejected أو all',
+  },
+  'This record was not found': {
+    fr: 'Cet enregistrement est introuvable',
+    ar: 'هذا السجل غير موجود',
+  },
+  'You already reported this. Wait for the answer.': {
+    fr: 'Vous avez déjà signalé cela. Attendez la réponse.',
+    ar: 'لقد أبلغت عن هذا بالفعل. انتظر الرد.',
+  },
+  'You have too many reports waiting. Wait for the answers first.': {
+    fr: "Vous avez trop de signalements en attente. Attendez d'abord les réponses.",
+    ar: 'لديك بلاغات كثيرة قيد الانتظار. انتظر الردود أولًا.',
+  },
+  'Correction request not found': {
+    fr: 'Demande de correction introuvable',
+    ar: 'طلب التصحيح غير موجود',
+  },
+  'This request was already handled': {
+    fr: 'Cette demande a déjà été traitée',
+    ar: 'تمت معالجة هذا الطلب بالفعل',
+  },
   // generic (AllExceptionsFilter)
   'The data sent was not valid': {
     fr: 'Les données envoyées ne sont pas valides',

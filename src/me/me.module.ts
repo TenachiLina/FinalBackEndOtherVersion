@@ -10,10 +10,12 @@ import { Task, TaskSchema } from '../tasks/task.schema';
 import { Worktime, WorktimeSchema } from '../worktime/worktime.shema';
 import { Advance, AdvanceSchema } from '../advances/advance.schema';
 import { Bonus, BonusSchema } from '../bonuses/bonus.schema';
+import { CorrectionsModule } from '../corrections/corrections.module';
 
 // Read only: nothing here writes to these collections.
 @Module({
   imports: [
+    CorrectionsModule,
     MongooseModule.forFeature([
       { name: User.name, schema: UserSchema },
       { name: Employee.name, schema: EmployeeSchema },

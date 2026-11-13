@@ -217,16 +217,18 @@ describe('the rules for sensitive routes', () => {
     ]);
   });
 
-  it('an employee (staff) account reaches only its own account and its own data, read only', () => {
+  it('an employee (staff) account reaches only its own account and its own data, and can only report mistakes', () => {
     const staffRoutes = routes.filter((r) => r.staff && !r.isPublic);
     expect(
       staffRoutes.filter((r) => !r.path.startsWith('/auth/')).map((r) => r.key),
     ).toEqual([
       'GET /me/advances',
       'GET /me/bonuses',
+      'GET /me/corrections',
       'GET /me/planning',
       'GET /me/profile',
       'GET /me/worktime',
+      'POST /me/corrections',
     ]);
     // The /me routes are for staff accounts only, and never kiosk routes
     for (const r of staffRoutes.filter((x) => x.path.startsWith('/me/'))) {
@@ -237,6 +239,19 @@ describe('the rules for sensitive routes', () => {
     expect(rule('GET /me/worktime').feature).toBe('clockin');
     expect(rule('GET /me/advances').feature).toBe('advances');
     expect(rule('GET /me/bonuses').feature).toBe('bonuses');
+  });
+
+  it('correction requests are handled by admins and managers', () => {
+    for (const key of [
+      'GET /corrections',
+      'GET /corrections/count',
+      'PATCH /corrections/:id',
+    ]) {
+      expect(rule(key)).toMatchObject({
+        roles: ['admin', 'manager'],
+        kiosk: false,
+      });
+    }
   });
 
   it('only sign-in, branding and the clocking machine are public', () => {

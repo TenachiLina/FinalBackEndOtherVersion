@@ -64,6 +64,9 @@ const ACTIONS: Record<string, string> = {
 
   'POST /bonuses': 'bonus.create',
   'DELETE /bonuses/:id': 'bonus.delete',
+
+  'POST /me/corrections': 'correction.report',
+  'PATCH /corrections/:id': 'correction.handle',
 };
 
 export function actionFor(method: string, route: string, body: any): string {

@@ -44,7 +44,7 @@ export class MeService {
   ) {}
 
   /** The employee record linked to this account, in the account's company. */
-  private async employeeOf(user: AuthUser) {
+  async employeeOf(user: AuthUser) {
     // Users are not tenant-scoped: filter by company explicitly.
     const account = await this.userModel
       .findOne({
