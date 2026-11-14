@@ -251,7 +251,20 @@ export class CompaniesService {
       }
       return value || undefined;
     };
+    // Empty means "never by itself"; otherwise whole days, 0 = as soon as the month ends
+    const rawDelay: unknown = s.monthCloseDelayDays;
+    let monthCloseDelayDays: number | null = null;
+    if (rawDelay !== null && rawDelay !== undefined && rawDelay !== '') {
+      const days = Number(rawDelay);
+      if (!Number.isInteger(days) || days < 0 || days > 365) {
+        throw new BadRequestException(
+          'Days before a month closes must be a whole number between 0 and 365',
+        );
+      }
+      monthCloseDelayDays = days;
+    }
     return {
+      monthCloseDelayDays,
       payslipActivity: text(s.payslipActivity, 'Activity', 120),
       payslipAddress: text(s.payslipAddress, 'Address', 200),
       payslipContributorNumber: text(

@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Bonus } from './bonus.schema';
 import { Employee, EmployeeDocument } from '../employees/employee.shema';
+import { MonthClosingService } from '../payroll/month-closing.service';
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -11,6 +12,7 @@ export class BonusesService {
   constructor(
     @InjectModel(Bonus.name) private readonly bonusModel: Model<Bonus>,
     @InjectModel(Employee.name) private readonly employeeModel: Model<EmployeeDocument>,
+    private readonly closing: MonthClosingService,
   ) {}
 
   async create(body: { emp_id: number; amount: number; date: string; reason: string }) {
@@ -20,6 +22,9 @@ export class BonusesService {
     if (!body.reason || !String(body.reason).trim()) throw new BadRequestException('reason is required');
     if (body.emp_id === undefined || body.emp_id === null) throw new BadRequestException('emp_id is required');
     if (!(await this.employeeModel.exists({ empNumber: body.emp_id }))) throw new BadRequestException('Employee not found');
+
+    // A closed month's pay is final
+    await this.closing.assertOpen(body.date);
 
     return this.bonusModel.create({
       emp_id: Number(body.emp_id),
@@ -47,6 +52,10 @@ export class BonusesService {
   }
 
   async remove(id: string) {
+    const current = Types.ObjectId.isValid(id)
+      ? await this.bonusModel.findById(id).select('date').lean()
+      : null;
+    await this.closing.assertOpen(current?.date);
     const removed = await this.bonusModel.findByIdAndDelete(id);
     if (!removed) throw new NotFoundException('Bonus not found');
     return { deleted: true };

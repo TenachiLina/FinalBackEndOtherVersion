@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Advance, AdvanceDocument } from './advance.schema';
 import { Employee, EmployeeDocument } from '../employees/employee.shema';
+import { MonthClosingService } from '../payroll/month-closing.service';
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -11,6 +12,7 @@ export class AdvancesService {
   constructor(
     @InjectModel(Advance.name) private advanceModel: Model<AdvanceDocument>,
     @InjectModel(Employee.name) private employeeModel: Model<EmployeeDocument>,
+    private readonly closing: MonthClosingService,
   ) {}
 
   /**
@@ -26,6 +28,8 @@ export class AdvancesService {
     if (data.emp_id === undefined || data.emp_id === null) throw new BadRequestException('emp_id is required');
     if (!(await this.employeeModel.exists({ empNumber: data.emp_id }))) throw new BadRequestException('Employee not found');
 
+    // A closed month's pay is final
+    await this.closing.assertOpen(data.date);
     const targetDate = new Date(data.date);
 
     const existing = await this.advanceModel
@@ -76,6 +80,10 @@ export class AdvancesService {
 
   /** Delete a specific advance by its own Mongo _id. */
   async remove(id: string): Promise<AdvanceDocument> {
+    const current = Types.ObjectId.isValid(id)
+      ? await this.advanceModel.findById(id).select('date').lean().exec()
+      : null;
+    await this.closing.assertOpen(current?.date);
     const deleted = await this.advanceModel.findByIdAndDelete(id).exec();
     if (!deleted) {
       throw new NotFoundException(`Advance ${id} not found.`);

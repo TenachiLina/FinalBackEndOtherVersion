@@ -6,9 +6,12 @@ import { Employee, EmployeeSchema } from '../employees/employee.shema';
 import { BonusesController } from './bonuses.controller';
 import { BonusesService } from './bonuses.service';
 
+import { PayrollModule } from '../payroll/payroll.module';
+
 @Module({
   imports: [
     EmployeesModule,
+    PayrollModule,
     MongooseModule.forFeature([
       { name: Bonus.name, schema: BonusSchema },
       { name: Employee.name, schema: EmployeeSchema },

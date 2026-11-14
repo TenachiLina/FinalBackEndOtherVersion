@@ -65,6 +65,9 @@ const ACTIONS: Record<string, string> = {
   'POST /bonuses': 'bonus.create',
   'DELETE /bonuses/:id': 'bonus.delete',
 
+  'POST /payroll/closings/:month/close': 'payroll.closeMonth',
+  'POST /payroll/closings/:month/reopen': 'payroll.reopenMonth',
+
   'POST /me/corrections': 'correction.report',
   'PATCH /corrections/:id': 'correction.handle',
 };

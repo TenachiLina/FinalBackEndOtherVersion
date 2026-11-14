@@ -8,6 +8,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { MonthClosingService } from '../payroll/month-closing.service';
 
 // A client may send "" for "no time": it is stored as null, like a cleared time
 function emptyTimesToNull(data: Partial<Worktime>): Partial<Worktime> {
@@ -23,6 +24,7 @@ export class WorktimeService {
   constructor(
     @InjectModel(Worktime.name)
     private worktimeModel: Model<WorktimeDocument>,
+    private readonly closing: MonthClosingService,
   ) {}
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -36,6 +38,8 @@ export class WorktimeService {
   ): Promise<WorktimeDocument> {
 
     const data = emptyTimesToNull(body);
+    // A closed month's hours are final
+    await this.closing.assertOpen(data.work_date);
 
     // Without them there is no day to look for: Mongoose would drop an
     // undefined key from the filter and overwrite someone else's record.
@@ -188,7 +192,13 @@ export class WorktimeService {
     id: string,
     data: Partial<Worktime>,
   ): Promise<WorktimeDocument> {
-
+    // Neither the record's own month nor the one it is moved to may be closed
+    const current = await this.worktimeModel
+      .findById(id)
+      .select('work_date')
+      .lean()
+      .exec();
+    await this.closing.assertOpen(current?.work_date, data?.work_date);
     const updated =
       await this.worktimeModel
         .findByIdAndUpdate(
@@ -219,7 +229,12 @@ export class WorktimeService {
   async remove(
     id: string,
   ): Promise<WorktimeDocument | null> {
-
+    const current = await this.worktimeModel
+      .findById(id)
+      .select('work_date')
+      .lean()
+      .exec();
+    await this.closing.assertOpen(current?.work_date);
     return this.worktimeModel
       .findByIdAndDelete(id)
       .exec();

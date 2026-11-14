@@ -243,6 +243,30 @@ const EXACT: Record<string, Tr> = {
     fr: 'La période ne peut pas dépasser 366 jours',
     ar: 'لا يمكن أن تتجاوز الفترة 366 يومًا',
   },
+  'This month is closed: its hours and pay can no longer be changed': {
+    fr: 'Ce mois est clôturé : ses heures et sa paie ne peuvent plus être modifiées',
+    ar: 'هذا الشهر مغلق: لا يمكن تعديل ساعاته ورواتبه بعد الآن',
+  },
+  'This month is not over yet': {
+    fr: "Ce mois n'est pas encore terminé",
+    ar: 'هذا الشهر لم ينته بعد',
+  },
+  'This month is already closed': {
+    fr: 'Ce mois est déjà clôturé',
+    ar: 'هذا الشهر مغلق بالفعل',
+  },
+  'This month is not closed': {
+    fr: "Ce mois n'est pas clôturé",
+    ar: 'هذا الشهر ليس مغلقًا',
+  },
+  'year must be a year (e.g. 2026)': {
+    fr: "L'année doit être une année (ex. 2026)",
+    ar: 'يجب أن تكون السنة سنة صحيحة (مثال: 2026)',
+  },
+  'Days before a month closes must be a whole number between 0 and 365': {
+    fr: 'Le nombre de jours avant la clôture doit être un entier entre 0 et 365',
+    ar: 'يجب أن يكون عدد الأيام قبل إغلاق الشهر عددًا صحيحًا بين 0 و 365',
+  },
   'empId must be an employee number': {
     fr: "empId doit être un numéro d'employé",
     ar: 'يجب أن يكون empId رقم موظف',

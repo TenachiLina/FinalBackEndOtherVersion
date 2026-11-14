@@ -27,6 +27,9 @@ export class CompanySettings {
   @Prop({ default: 26 }) workingDaysPerMonth!: number;
   // Share of earned pay offered as a weekly advance (0.5 = half)
   @Prop({ default: 0.5 }) weeklyAdvanceRatio!: number;
+  // Days after the end of a month at which it closes by itself (its hours
+  // and pay can then no longer change). Empty: months are closed by hand only.
+  @Prop({ type: Number, default: null }) monthCloseDelayDays?: number | null;
   // Payslip header (the company name comes from Company.name)
   @Prop({ trim: true }) payslipActivity?: string;
   @Prop({ trim: true }) payslipAddress?: string;
