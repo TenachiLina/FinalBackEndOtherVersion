@@ -243,6 +243,14 @@ const EXACT: Record<string, Tr> = {
     fr: 'La période ne peut pas dépasser 366 jours',
     ar: 'لا يمكن أن تتجاوز الفترة 366 يومًا',
   },
+  'empId must be an employee number': {
+    fr: "empId doit être un numéro d'employé",
+    ar: 'يجب أن يكون empId رقم موظف',
+  },
+  'month must be YYYY-MM (e.g. 2026-11)': {
+    fr: 'Le mois doit être au format AAAA-MM (ex. 2026-11)',
+    ar: 'يجب أن يكون الشهر بصيغة YYYY-MM (مثال: 2026-11)',
+  },
   'emp_id is required': { fr: "L'employé est obligatoire", ar: 'الموظف مطلوب' },
   'reason is required': { fr: 'Le motif est obligatoire', ar: 'السبب مطلوب' },
   'Choose the month to copy and the month to copy to': {
