@@ -16,6 +16,15 @@ const withTz = (tz: string, fn: () => void) => {
   }
 };
 
+// Jest gives each test file a copy of process.env, so setting TZ in a test
+// does not move the clock: a "server in Algiers" can only be tested where the
+// machine really is on Algerian time (UTC+1, no summer time). Elsewhere (the
+// CI server runs in UTC) those tests are skipped instead of failing.
+const onAlgiersTime =
+  new Date(2026, 0, 1).getTimezoneOffset() === -60 &&
+  new Date(2026, 6, 1).getTimezoneOffset() === -60;
+const itInAlgiers = onAlgiersTime ? it : it.skip;
+
 describe('parseYearMonth', () => {
   it.each([
     ['2026', '12', { year: 2026, month: 12 }],
@@ -117,14 +126,17 @@ describe('clockingRange', () => {
     });
   });
 
-  it("includes a worked day saved at the server's local midnight, not the next month's first day", () => {
-    withTz('Africa/Algiers', () => {
-      const r = clockingRange({ year: 2026, month: 12 });
-      // new Date('2026-12-01T00:00:00') in Algiers
-      expect(inside('2026-11-30T23:00:00Z', r)).toBe(true);
-      expect(inside('2026-12-31T23:00:00Z', r)).toBe(false); // 1 January
-    });
-  });
+  itInAlgiers(
+    "includes a worked day saved at the server's local midnight, not the next month's first day",
+    () => {
+      withTz('Africa/Algiers', () => {
+        const r = clockingRange({ year: 2026, month: 12 });
+        // new Date('2026-12-01T00:00:00') in Algiers
+        expect(inside('2026-11-30T23:00:00Z', r)).toBe(true);
+        expect(inside('2026-12-31T23:00:00Z', r)).toBe(false); // 1 January
+      });
+    },
+  );
 
   it("includes a worked day saved at UTC midnight, not the next month's first day", () => {
     withTz('UTC', () => {
@@ -135,12 +147,15 @@ describe('clockingRange', () => {
     });
   });
 
-  it('leaves out a punch at 00:30 in Algiers on the 1st of the next month (server in Algiers)', () => {
-    withTz('Africa/Algiers', () => {
-      const r = clockingRange({ year: 2026, month: 12 });
-      expect(inside('2026-12-31T23:30:00Z', r)).toBe(false);
-    });
-  });
+  itInAlgiers(
+    'leaves out a punch at 00:30 in Algiers on the 1st of the next month (server in Algiers)',
+    () => {
+      withTz('Africa/Algiers', () => {
+        const r = clockingRange({ year: 2026, month: 12 });
+        expect(inside('2026-12-31T23:30:00Z', r)).toBe(false);
+      });
+    },
+  );
 
   it('includes the whole last day of the month', () => {
     withTz('UTC', () => {
