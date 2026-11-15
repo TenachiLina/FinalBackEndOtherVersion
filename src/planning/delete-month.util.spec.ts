@@ -78,10 +78,18 @@ describe('currentMonthInAlgiers', () => {
 
 describe('compareMonths', () => {
   it('orders months across years', () => {
-    expect(compareMonths({ year: 2026, month: 11 }, { year: 2026, month: 11 })).toBe(0);
-    expect(compareMonths({ year: 2026, month: 10 }, { year: 2026, month: 11 })).toBeLessThan(0);
-    expect(compareMonths({ year: 2027, month: 1 }, { year: 2026, month: 12 })).toBeGreaterThan(0);
-    expect(compareMonths({ year: 2025, month: 12 }, { year: 2026, month: 1 })).toBeLessThan(0);
+    expect(
+      compareMonths({ year: 2026, month: 11 }, { year: 2026, month: 11 }),
+    ).toBe(0);
+    expect(
+      compareMonths({ year: 2026, month: 10 }, { year: 2026, month: 11 }),
+    ).toBeLessThan(0);
+    expect(
+      compareMonths({ year: 2027, month: 1 }, { year: 2026, month: 12 }),
+    ).toBeGreaterThan(0);
+    expect(
+      compareMonths({ year: 2025, month: 12 }, { year: 2026, month: 1 }),
+    ).toBeLessThan(0);
   });
 });
 
@@ -118,7 +126,7 @@ describe('clockingRange', () => {
     });
   });
 
-  it('includes a worked day saved at UTC midnight, not the next month\'s first day', () => {
+  it("includes a worked day saved at UTC midnight, not the next month's first day", () => {
     withTz('UTC', () => {
       const r = clockingRange({ year: 2026, month: 12 });
       expect(inside('2026-12-01T00:00:00Z', r)).toBe(true);
