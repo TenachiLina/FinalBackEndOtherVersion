@@ -12,42 +12,8 @@ import { pickLang, translateMessage } from './messages.i18n';
 import { sanitize } from './sanitize';
 import { clientInfo } from '../auth/client-info';
 import { newReference, reportError } from '../error-logs/error-reporter';
+import { capitalize, label } from './field-labels';
 
-// Field names as people say them, for messages like "first name is required".
-const FIELD_LABELS: Record<string, string> = {
-  empNumber: 'employee number',
-  emp_id: 'employee',
-  empId: 'employee',
-  taskId: 'task number',
-  taskName: 'task name',
-  firstName: 'first name',
-  lastName: 'last name',
-  baseSalary: 'base salary',
-  phoneNumber: 'phone number',
-  startTime: 'start time',
-  endTime: 'end time',
-  shiftId: 'shift',
-  planDate: 'date',
-  deviceLogId: 'device record',
-  deviceUserId: 'device user',
-  slug: 'sign-in link name',
-  'devices.serial': 'device serial',
-  email: 'email',
-};
-
-function label(field: string): string {
-  if (FIELD_LABELS[field]) return FIELD_LABELS[field];
-  const last = field.split('.').pop() ?? field;
-  return (
-    FIELD_LABELS[last] ??
-    last
-      .replace(/_/g, ' ')
-      .replace(/([a-z])([A-Z])/g, '$1 $2')
-      .toLowerCase()
-  );
-}
-
-const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /**
  * Turns every error into a JSON answer the app can show as is:

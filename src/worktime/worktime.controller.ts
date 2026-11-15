@@ -3,6 +3,8 @@ import { WorktimeService } from './worktime.service';
 import { CurrentUser, RequireFeature, Roles } from '../auth/auth.decorators';
 import type { AuthUser } from '../auth/auth.decorators';
 import { ManagerVisibilityService } from '../employees/manager-visibility.service';
+import { WORKTIME_FIELDS } from '../common/body-rules';
+import { validateBody } from '../common/validate';
 
 @RequireFeature('clockin')
 @Controller('worktime')
@@ -12,7 +14,9 @@ export class WorktimeController {
     private readonly visibility: ManagerVisibilityService,
   ) { }
 
-  @Post() create(@Body() body: any) { return this.worktimeService.create(body); }
+  @Post() create(@Body() body: unknown) {
+    return this.worktimeService.create(validateBody(body, WORKTIME_FIELDS));
+  }
 
   @Get()
   findAll(@Query() query: any) {
@@ -30,6 +34,11 @@ export class WorktimeController {
   }
 
   @Get(':id') findOne(@Param('id') id: string) { return this.worktimeService.findOne(id); }
-  @Put(':id') update(@Param('id') id: string, @Body() body: any) { return this.worktimeService.update(id, body); }
+  @Put(':id') update(@Param('id') id: string, @Body() body: unknown) {
+    return this.worktimeService.update(
+      id,
+      validateBody(body, WORKTIME_FIELDS, 'partial'),
+    );
+  }
   @Delete(':id') remove(@Param('id') id: string) { return this.worktimeService.remove(id); }
 }

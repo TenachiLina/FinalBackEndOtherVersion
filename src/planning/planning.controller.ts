@@ -10,6 +10,8 @@ import {
   Res,
 } from '@nestjs/common';
 import { PlanningService } from './planning.service';
+import { PLANNING_FIELDS } from '../common/body-rules';
+import { validateBody } from '../common/validate';
 import type { Response } from "express";
 import { RequireFeature } from '../auth/auth.decorators';
 
@@ -20,8 +22,8 @@ export class PlanningController {
   constructor(private readonly planningService: PlanningService) {}
 
   @Post()
-  create(@Body() body: any) {
-    return this.planningService.create(body);
+  create(@Body() body: unknown) {
+    return this.planningService.create(validateBody(body, PLANNING_FIELDS));
   }
 
   /** Save all planning entries for a date (replaces existing ones for that day) */
@@ -162,8 +164,11 @@ export class PlanningController {
   }
 
   @Put(':id')
-  update(@Param('id') id: string, @Body() body: any) {
-    return this.planningService.update(id, body);
+  update(@Param('id') id: string, @Body() body: unknown) {
+    return this.planningService.update(
+      id,
+      validateBody(body, PLANNING_FIELDS, 'partial'),
+    );
   }
 
   /** Delete every same weekday of a month, e.g. all Thursdays of 2026-12 */

@@ -13,6 +13,8 @@ import {
 } from '@nestjs/common';
 import { EmployeesService, archiveStatus } from './employees.service';
 import { subscriptionState } from '../companies/subscription.util';
+import { EMPLOYEE_FIELDS } from '../common/body-rules';
+import { validateBody } from '../common/validate';
 import { ManagerVisibilityService } from './manager-visibility.service';
 import { CurrentUser, Roles } from '../auth/auth.decorators';
 import type { AuthUser } from '../auth/auth.decorators';
@@ -53,10 +55,11 @@ export class EmployeesController {
     @Req() req: { company?: { subscription?: any } | null },
     @Body() body: any,
   ) {
+    const data = validateBody(body, EMPLOYEE_FIELDS);
     await this.employeesService.assertRoomFor(
       subscriptionState(req.company?.subscription).maxEmployees,
     );
-    return this.employeesService.create(body);
+    return this.employeesService.create(data);
   }
   /**
    * GET /employees[?status=active|archived|all]
@@ -91,15 +94,20 @@ export class EmployeesController {
   @Body() body: any,
   ) {
     await this.assertCanChange(user, id);
+    const data = validateBody<Record<string, any>>(
+      body,
+      EMPLOYEE_FIELDS,
+      'partial',
+    );
 
-    if (body?.baseSalary !== undefined && (await this.visibility.isOwnRecord(user, id))) {
+    if (data.baseSalary !== undefined && (await this.visibility.isOwnRecord(user, id))) {
       const current: any = await this.employeesService.findOne(id);
-      if (current && Number(body.baseSalary) !== Number(current.baseSalary)) {
+      if (current && Number(data.baseSalary) !== Number(current.baseSalary)) {
         throw new ForbiddenException('Only an admin can change your salary');
       }
     }
 
-    return this.employeesService.update(id, body);
+    return this.employeesService.update(id, data);
   }
   /** Archives an employee who left: off the daily screens, history and pay kept. */
   @Roles('admin', 'manager') @Patch(':id/archive') async archive(

@@ -1,13 +1,17 @@
 import { Controller, Get, Post, Put, Patch, Delete, Param, Body, Query } from '@nestjs/common';
 import { ShiftsService } from './shifts.service';
 import { RequireFeature } from '../auth/auth.decorators';
+import { SHIFT_FIELDS } from '../common/body-rules';
+import { validateBody } from '../common/validate';
 
 @RequireFeature('planning')
 @Controller('shifts')
 export class ShiftsController {
   constructor(private readonly shiftsService: ShiftsService) {}
 
-  @Post() create(@Body() body: any) { return this.shiftsService.create(body); }
+  @Post() create(@Body() body: unknown) {
+    return this.shiftsService.create(validateBody(body, SHIFT_FIELDS));
+  }
 
   @Get()
   findAll(@Query('status') status?: 'active' | 'archived' | 'all') {
@@ -16,7 +20,12 @@ export class ShiftsController {
 
   @Get(':id') findOne(@Param('id') id: string) { return this.shiftsService.findOne(id); }
 
-  @Put(':id') update(@Param('id') id: string, @Body() body: any) { return this.shiftsService.update(id, body); }
+  @Put(':id') update(@Param('id') id: string, @Body() body: unknown) {
+    return this.shiftsService.update(
+      id,
+      validateBody(body, SHIFT_FIELDS, 'partial'),
+    );
+  }
 
   @Patch(':id/archive')
   archive(@Param('id') id: string) { return this.shiftsService.setArchived(id, true); }

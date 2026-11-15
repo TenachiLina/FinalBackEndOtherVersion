@@ -12,14 +12,16 @@ import {
 import { TasksService } from './tasks.service';
 import { RequireFeature } from '../auth/auth.decorators';
 import { archiveStatus } from '../employees/employees.service';
+import { TASK_FIELDS } from '../common/body-rules';
+import { validateBody } from '../common/validate';
 
 @RequireFeature('planning')
 @Controller('tasks')
 export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
 
-  @Post() create(@Body() body: any) {
-    return this.tasksService.create(body);
+  @Post() create(@Body() body: unknown) {
+    return this.tasksService.create(validateBody(body, TASK_FIELDS));
   }
 
   /** GET /tasks[?status=active|archived|all]: every post when status is missing. */
@@ -31,8 +33,11 @@ export class TasksController {
     return this.tasksService.findOne(id);
   }
 
-  @Put(':id') update(@Param('id') id: string, @Body() body: any) {
-    return this.tasksService.update(id, body);
+  @Put(':id') update(@Param('id') id: string, @Body() body: unknown) {
+    return this.tasksService.update(
+      id,
+      validateBody(body, TASK_FIELDS, 'partial'),
+    );
   }
 
   @Patch(':id/archive') archive(@Param('id') id: string) {
