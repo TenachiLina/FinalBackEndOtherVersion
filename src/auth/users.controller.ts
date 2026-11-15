@@ -55,6 +55,27 @@ export class UsersController {
     await this.sessions.revokeAllForUser(id, 'password_reset', { by: actor.id });
   }
 
+  /** Archives the account of someone who left: signed out everywhere, kept in the activity log. */
+  @Patch(':id/archive')
+  async archive(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
+    const user = await this.usersService.update(
+      id,
+      actor.companyId!,
+      actor.id,
+      { archived: true },
+    );
+    await this.sessions.revokeAllForUser(id, 'account_disabled', { by: actor.id });
+    return user;
+  }
+
+  /** Brings an archived account back: it can sign in again. */
+  @Patch(':id/restore')
+  restore(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
+    return this.usersService.update(id, actor.companyId!, actor.id, {
+      archived: false,
+    });
+  }
+
   @Delete(':id')
   @HttpCode(204)
   async remove(@Param('id') id: string, @CurrentUser() actor: AuthUser) {

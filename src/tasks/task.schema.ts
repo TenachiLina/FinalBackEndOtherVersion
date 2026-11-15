@@ -8,6 +8,8 @@ export type TaskDocument = Task & Document;
 export class Task {
   @Prop({ required: true }) taskId!: number;
   @Prop({ required: true }) taskName!: string;
+  // A post no longer used: off the planning pickers, kept in old planning
+  @Prop({ default: false }) isArchived?: boolean;
 }
 
 export const TaskSchema = SchemaFactory.createForClass(Task);

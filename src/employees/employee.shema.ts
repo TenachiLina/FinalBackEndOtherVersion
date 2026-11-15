@@ -25,6 +25,9 @@ export class Employee {
   // Declared to social security; the payslip uses declaredSalary when it is set
   @Prop() insured?: boolean;
   @Prop({ type: Number }) declaredSalary?: number | null;
+  // An employee who left: off the daily screens, kept in history and pay
+  @Prop({ default: false }) isArchived?: boolean;
+  @Prop({ type: Date, default: null }) archivedAt?: Date | null;
 }
 
 export const EmployeeSchema = SchemaFactory.createForClass(Employee);

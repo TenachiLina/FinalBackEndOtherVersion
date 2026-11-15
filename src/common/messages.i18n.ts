@@ -375,6 +375,23 @@ const EXACT: Record<string, Tr> = {
     fr: 'La référence ne peut pas dépasser 80 caractères',
     ar: 'يجب ألا يتجاوز المرجع 80 حرفًا',
   },
+  'status must be active, archived or all': {
+    fr: 'Le statut doit être active, archived ou all',
+    ar: 'يجب أن تكون الحالة active أو archived أو all',
+  },
+  'This employee has planning, hours or pay on record: archive them instead of deleting them':
+    {
+      fr: "Cet employé a du planning, des heures ou de la paie enregistrés : archivez-le au lieu de le supprimer",
+      ar: 'لهذا الموظف تخطيط أو ساعات أو رواتب مسجّلة: أرشفوه بدل حذفه',
+    },
+  'This post is used in the planning: archive it instead of deleting it': {
+    fr: 'Ce poste est utilisé dans le planning : archivez-le au lieu de le supprimer',
+    ar: 'هذا المنصب مستخدم في التخطيط: أرشفوه بدل حذفه',
+  },
+  "You can't archive your own employee record": {
+    fr: 'Vous ne pouvez pas archiver votre propre fiche employé',
+    ar: 'لا يمكنكم أرشفة ملفكم الوظيفي',
+  },
   'empId must be an employee number': {
     fr: "empId doit être un numéro d'employé",
     ar: 'يجب أن يكون empId رقم موظف',

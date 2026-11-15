@@ -30,6 +30,8 @@ export class User {
   })
   companyId!: Types.ObjectId | null;
   @Prop({ default: true }) active!: boolean;
+  // Someone who left: can't sign in, off the Users list, kept for the activity log
+  @Prop({ default: false }) isArchived?: boolean;
   // For a manager: the employee record that is this person. Other managers
   // don't see that employee on salary pages (see ManagerVisibilityService).
   // For a staff account: required, the employee whose data the account reads.

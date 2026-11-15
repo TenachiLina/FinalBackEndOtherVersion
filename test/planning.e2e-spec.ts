@@ -104,7 +104,8 @@ describe('single entries', () => {
     await plan(ali, morning, '2026-10-20');
     await plan(sara, evening, '2026-10-20');
     await plan(omar, morning, '2026-10-20');
-    await admin.delete(`/employees/${ali._id}`);
+    // An employee deleted before archiving existed (the API now refuses this)
+    await t.model('Employee').collection.deleteOne({ _id: ali._id });
     await admin.delete(`/shifts/${evening._id}?force=true`);
 
     // The Clock-in pages read empId._id / shiftId._id of every entry
@@ -331,7 +332,8 @@ describe('importing a day (GET /planning/import/:date)', () => {
     const { admin, morning, evening, ali, sara, plan } = await setup();
     await plan(ali, morning, '2026-10-20');
     await plan(sara, evening, '2026-10-20');
-    await admin.delete(`/employees/${ali._id}`);
+    // An employee deleted before archiving existed (the API now refuses this)
+    await t.model('Employee').collection.deleteOne({ _id: ali._id });
     await admin.delete(`/shifts/${evening._id}?force=true`);
     const res = await admin.get('/planning/import/2026-10-20');
     expect(res.status).toBe(200);
@@ -342,7 +344,8 @@ describe('importing a day (GET /planning/import/:date)', () => {
     const { admin, morning, ali, sara, plan } = await setup();
     await plan(ali, morning, '2026-10-20');
     await plan(sara, morning, '2026-10-20');
-    await admin.delete(`/employees/${ali._id}`);
+    // An employee deleted before archiving existed (the API now refuses this)
+    await t.model('Employee').collection.deleteOne({ _id: ali._id });
     const res = await admin.get('/planning/import/2026-10-20');
     expect(res.body.map((e: any) => e.title)).toEqual(['Sara Kaci']);
   });
@@ -465,16 +468,17 @@ describe('copying a month (POST /planning/copy-month)', () => {
 });
 
 describe('deleting a weekday of a month (DELETE /planning/weekday)', () => {
-  const del = (admin: any, qs: string) => admin.delete(`/planning/weekday?${qs}`);
+  const del = (admin: any, qs: string) =>
+    admin.delete(`/planning/weekday?${qs}`);
   const left = async (admin: any) => names(await admin.get('/planning'));
 
   it('deletes every Thursday of the month and keeps the other weekdays and months', async () => {
     const { admin, morning, ali, sara, omar, plan } = await setup();
-    await plan(ali, morning, '2026-10-01');  // Thu  → deleted
+    await plan(ali, morning, '2026-10-01'); // Thu  → deleted
     await plan(sara, morning, '2026-10-22'); // Thu  → deleted
     await plan(omar, morning, '2026-10-02'); // Fri  → kept
-    await plan(ali, morning, '2026-11-05');  // Thu in November → kept
-    await plan(ali, morning, '2026-09-24');  // Thu in September → kept
+    await plan(ali, morning, '2026-11-05'); // Thu in November → kept
+    await plan(ali, morning, '2026-09-24'); // Thu in September → kept
 
     const res = await del(admin, 'year=2026&month=10&weekday=4');
 
@@ -499,14 +503,16 @@ describe('deleting a weekday of a month (DELETE /planning/weekday)', () => {
 
   it('stops at the month boundaries', async () => {
     const { admin, morning, ali, sara, omar, plan } = await setup();
-    await plan(ali, morning, '2026-11-01');  // Sun, first day of Nov → deleted
+    await plan(ali, morning, '2026-11-01'); // Sun, first day of Nov → deleted
     await plan(sara, morning, '2026-10-25'); // Sun, last Sunday of Oct → kept
     await plan(omar, morning, '2026-12-06'); // Sun, first Sunday of Dec → kept
 
     const res = await del(admin, 'year=2026&month=11&weekday=0');
 
     expect(res.body.deletedCount).toBe(1);
-    expect(await left(admin)).toEqual(['Sara@2026-10-25', 'Omar@2026-12-06'].sort());
+    expect(await left(admin)).toEqual(
+      ['Sara@2026-10-25', 'Omar@2026-12-06'].sort(),
+    );
   });
 
   it('gives the same result whatever the time zone of the server', async () => {
@@ -590,10 +596,19 @@ describe('deleting a whole month (DELETE /planning/month)', () => {
     await s.plan(s.ali, s.morning, '2026-12-15');
     return s;
   }
-  const ALL = ['Ali@2026-09-15', 'Ali@2026-10-15', 'Ali@2026-11-15', 'Ali@2026-12-15'];
+  const ALL = [
+    'Ali@2026-09-15',
+    'Ali@2026-10-15',
+    'Ali@2026-11-15',
+    'Ali@2026-12-15',
+  ];
 
   const worked = (s: Awaited<ReturnType<typeof setup>>, fields: object) =>
-    seed.worktime(s.company.id, { emp_id: 1, shift_id: s.id(s.morning), ...fields });
+    seed.worktime(s.company.id, {
+      emp_id: 1,
+      shift_id: s.id(s.morning),
+      ...fields,
+    });
   const machinePunch = (companyId: string, timestamp: string) =>
     runForCompany(companyId, async () => {
       await t.model('RawAttendanceLog').create({
@@ -615,7 +630,12 @@ describe('deleting a whole month (DELETE /planning/month)', () => {
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ deletedCount: 4 });
     expect(await left(s.admin)).toEqual(
-      ['Ali@2026-09-15', 'Ali@2026-10-15', 'Ali@2026-11-15', 'Omar@2027-01-01'].sort(),
+      [
+        'Ali@2026-09-15',
+        'Ali@2026-10-15',
+        'Ali@2026-11-15',
+        'Omar@2027-01-01',
+      ].sort(),
     );
   });
 
@@ -668,7 +688,9 @@ describe('deleting a whole month (DELETE /planning/month)', () => {
     const s = await fourMonths();
     const res = await del(s.admin, 'year=2026&month=9');
     expect(res.body).toEqual({ deletedCount: 1 });
-    expect(await left(s.admin)).toEqual(ALL.filter((n) => !n.includes('2026-09')));
+    expect(await left(s.admin)).toEqual(
+      ALL.filter((n) => !n.includes('2026-09')),
+    );
   });
 
   it.each([
@@ -676,22 +698,31 @@ describe('deleting a whole month (DELETE /planning/month)', () => {
     ['a clock-out only', { clock_out: '16:05' }],
     ['a clock-in at midnight ("00:00" is a real time)', { clock_in: '00:00' }],
     ['a recorded absence', { absent: true, absent_comment: 'Sick' }],
-  ])('refuses a past month with %s, and deletes nothing', async (_name, fields) => {
-    const s = await fourMonths();
-    await worked(s, { work_date: new Date('2026-10-20T00:00:00'), ...fields });
+  ])(
+    'refuses a past month with %s, and deletes nothing',
+    async (_name, fields) => {
+      const s = await fourMonths();
+      await worked(s, {
+        work_date: new Date('2026-10-20T00:00:00'),
+        ...fields,
+      });
 
-    const res = await del(s.admin, 'year=2026&month=10');
+      const res = await del(s.admin, 'year=2026&month=10');
 
-    expect(res.status).toBe(409);
-    expect(res.body.message).toBe(CLOCKED);
-    expect(await left(s.admin)).toEqual(ALL);
-  });
+      expect(res.status).toBe(409);
+      expect(res.body.message).toBe(CLOCKED);
+      expect(await left(s.admin)).toEqual(ALL);
+    },
+  );
 
   it('refuses a month whose worked day is saved at local midnight in Algiers', async () => {
     const s = await fourMonths();
     await withTimeZone('Africa/Algiers', async () => {
       // new Date('2026-10-01T00:00:00') in Algiers = 30 September 23:00 UTC
-      await worked(s, { work_date: new Date('2026-10-01T00:00:00'), clock_in: '08:00' });
+      await worked(s, {
+        work_date: new Date('2026-10-01T00:00:00'),
+        clock_in: '08:00',
+      });
       const res = await del(s.admin, 'year=2026&month=10');
       expect(res.status).toBe(409);
       // ...and it does not belong to September
@@ -739,7 +770,10 @@ describe('deleting a whole month (DELETE /planning/month)', () => {
 
   it('also refuses a future month that somehow already has clock-ins', async () => {
     const s = await fourMonths();
-    await worked(s, { work_date: new Date('2026-12-03T00:00:00'), clock_in: '08:00' });
+    await worked(s, {
+      work_date: new Date('2026-12-03T00:00:00'),
+      clock_in: '08:00',
+    });
     const res = await del(s.admin, 'year=2026&month=12');
     expect(res.status).toBe(409);
     expect(await left(s.admin)).toEqual(ALL);
@@ -760,8 +794,14 @@ describe('deleting a whole month (DELETE /planning/month)', () => {
 
   it('is not stopped by clock-ins of the months around it', async () => {
     const s = await fourMonths();
-    await worked(s, { work_date: new Date('2026-08-31T00:00:00'), clock_in: '08:00' });
-    await worked(s, { work_date: new Date('2026-10-01T00:00:00'), clock_in: '08:00' });
+    await worked(s, {
+      work_date: new Date('2026-08-31T00:00:00'),
+      clock_in: '08:00',
+    });
+    await worked(s, {
+      work_date: new Date('2026-10-01T00:00:00'),
+      clock_in: '08:00',
+    });
     await machinePunch(s.company.id, '2026-08-31T12:00:00Z');
     await machinePunch(s.company.id, '2026-10-02T12:00:00Z');
 
@@ -773,7 +813,10 @@ describe('deleting a whole month (DELETE /planning/month)', () => {
   it("is not stopped by another company's clock-ins, and never deletes its planning", async () => {
     const mine = await fourMonths();
     const other = await fourMonths();
-    await worked(other, { work_date: new Date('2026-09-10T00:00:00'), clock_in: '08:00' });
+    await worked(other, {
+      work_date: new Date('2026-09-10T00:00:00'),
+      clock_in: '08:00',
+    });
     await machinePunch(other.company.id, '2026-09-10T07:00:00Z');
 
     const res = await del(mine.admin, 'year=2026&month=9');
@@ -815,7 +858,6 @@ describe('deleting a whole month (DELETE /planning/month)', () => {
     expect(await left(s.admin)).toEqual(ALL);
   });
 });
-
 
 describe('exports', () => {
   /** Sara and Omar in the first week of October 2026, Ali outside it. */

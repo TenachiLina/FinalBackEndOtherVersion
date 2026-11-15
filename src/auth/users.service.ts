@@ -39,6 +39,8 @@ export interface UpdateUserInput {
   role?: Role;
   active?: boolean;
   employeeId?: string | null;
+  /** true archives the account (it can't sign in any more), false brings it back */
+  archived?: boolean;
 }
 
 /**
@@ -233,6 +235,11 @@ export class UsersService {
     }
     if (input.role !== undefined) user.role = this.validateRole(input.role);
     if (input.active !== undefined) user.active = Boolean(input.active);
+    if (input.archived !== undefined) {
+      // An archived account can't sign in; restoring gives the access back
+      user.isArchived = Boolean(input.archived);
+      user.active = !user.isArchived;
+    }
     if (input.employeeId !== undefined || input.role !== undefined) {
       user.employeeId = await this.validateEmployeeLink(
         input.employeeId !== undefined ? input.employeeId : user.employeeId,

@@ -7,9 +7,11 @@ import {
   Delete,
   Param,
   Body,
+  Patch,
+  Query,
   Req,
 } from '@nestjs/common';
-import { EmployeesService } from './employees.service';
+import { EmployeesService, archiveStatus } from './employees.service';
 import { subscriptionState } from '../companies/subscription.util';
 import { ManagerVisibilityService } from './manager-visibility.service';
 import { CurrentUser, Roles } from '../auth/auth.decorators';
@@ -56,9 +58,17 @@ export class EmployeesController {
     );
     return this.employeesService.create(body);
   }
-  @Get() async findAll(@CurrentUser() user: AuthUser) {
+  /**
+   * GET /employees[?status=active|archived|all]
+   * Everyone when status is missing, each with isArchived: history and
+   * reports need the people who left; pickers ask for status=active.
+   */
+  @Get() async findAll(
+    @CurrentUser() user: AuthUser,
+    @Query('status') status?: string,
+  ) {
     const [employees, hidden] = await Promise.all([
-      this.employeesService.findAll(),
+      this.employeesService.findAll(archiveStatus(status)),
       this.visibility.hiddenFor(user),
     ]);
     return employees.map((e) =>
@@ -91,6 +101,35 @@ export class EmployeesController {
 
     return this.employeesService.update(id, body);
   }
+  /** Archives an employee who left: off the daily screens, history and pay kept. */
+  @Roles('admin', 'manager') @Patch(':id/archive') async archive(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+  ) {
+    await this.assertCanChange(user, id);
+    if (await this.visibility.isOwnRecord(user, id)) {
+      throw new ForbiddenException("You can't archive your own employee record");
+    }
+    return this.employeesService.setArchived(id, true);
+  }
+
+  /** Brings an archived employee back (they count again in the pack's limit). */
+  @Roles('admin', 'manager') @Patch(':id/restore') async restore(
+    @CurrentUser() user: AuthUser,
+    @Req() req: { company?: { subscription?: any } | null },
+    @Param('id') id: string,
+  ) {
+    await this.assertCanChange(user, id);
+    const employee = await this.employeesService.findOne(id);
+    if (employee.isArchived) {
+      await this.employeesService.assertRoomFor(
+        subscriptionState(req.company?.subscription).maxEmployees,
+      );
+    }
+    return this.employeesService.setArchived(id, false);
+  }
+
+  /** Deletes an employee added by mistake; one with history is refused (archive instead). */
   @Roles('admin', 'manager') @Delete(':id') async remove(
   @CurrentUser() user: AuthUser,
   @Param('id') id: string,

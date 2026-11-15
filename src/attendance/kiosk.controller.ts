@@ -82,7 +82,7 @@ export class KioskController {
     const now = new Date();
     const [employees, recent, planned] = await Promise.all([
       this.employeeModel
-        .find()
+        .find({ isArchived: { $ne: true } })
         .select('empNumber firstName lastName personalImage')
         .sort({ firstName: 1, lastName: 1 })
         .lean()
@@ -120,7 +120,7 @@ export class KioskController {
     const empNumber = Number(body?.empNumber);
     const employee = Number.isFinite(empNumber)
       ? await this.employeeModel
-          .findOne({ empNumber })
+          .findOne({ empNumber, isArchived: { $ne: true } })
           .select('empNumber firstName lastName')
           .lean()
           .exec()

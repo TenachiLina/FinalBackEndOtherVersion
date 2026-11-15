@@ -31,6 +31,12 @@ const ACTIONS: Record<string, string> = {
   'POST /employees': 'employee.create',
   'PUT /employees/:id': 'employee.update',
   'DELETE /employees/:id': 'employee.delete',
+  'PATCH /employees/:id/archive': 'employee.archive',
+  'PATCH /employees/:id/restore': 'employee.restore',
+  'PATCH /tasks/:id/archive': 'task.archive',
+  'PATCH /tasks/:id/restore': 'task.restore',
+  'PATCH /users/:id/archive': 'user.archive',
+  'PATCH /users/:id/restore': 'user.restore',
 
   'POST /shifts': 'shift.create',
   'PUT /shifts/:id': 'shift.update',
