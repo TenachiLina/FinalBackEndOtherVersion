@@ -47,6 +47,8 @@ export class ZktecoController {
       res.status(HttpStatus.FORBIDDEN).type('text/plain').send('ERROR');
       return false;
     }
+    // The machine is alive: remembered so a silent machine can be reported
+    void this.companiesService.touchDevice(serial!.trim()).catch(() => undefined);
     // Everything this request saves belongs to the device's company.
     setCurrentCompany(String(company._id));
     this.utcOffset.set(serial!.trim(), company.settings?.utcOffset || '+01:00');

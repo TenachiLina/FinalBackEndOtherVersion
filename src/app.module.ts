@@ -48,6 +48,7 @@ import { ReportsModule } from './reports/reports.module';
 import { MeModule } from './me/me.module';
 import { CorrectionsModule } from './corrections/corrections.module';
 import { PayrollModule } from './payroll/payroll.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -86,6 +87,7 @@ import { PayrollModule } from './payroll/payroll.module';
     MeModule,
     CorrectionsModule,
     PayrollModule,
+    NotificationsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

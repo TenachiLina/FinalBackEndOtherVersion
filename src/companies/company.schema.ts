@@ -45,6 +45,9 @@ export class CompanyDevice {
   @Prop({ trim: true }) name?: string;
   // Address the server reaches the machine at, for Sync and /device/*
   @Prop({ trim: true }) ip?: string;
+  // The last time the machine talked to the server (ADMS push). A machine
+  // that was talking and stopped is reported in the notifications.
+  @Prop({ type: Date }) lastSeenAt?: Date;
 }
 export const CompanyDeviceSchema = SchemaFactory.createForClass(CompanyDevice);
 

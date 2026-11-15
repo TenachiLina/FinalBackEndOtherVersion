@@ -167,11 +167,19 @@ export class CompaniesService {
       if (!Array.isArray(input.devices)) {
         throw new BadRequestException('Devices must be a list');
       }
+      // Saving the list must not forget when each machine was last heard from
+      const seen = new Map(
+        (company.devices ?? []).map((d) => [d.serial, d.lastSeenAt]),
+      );
       const devices = input.devices
-        .map((d) => ({
-          serial: String(d?.serial ?? '').trim(),
-          name: d?.name ? String(d.name).trim() : undefined,
-        }))
+        .map((d) => {
+          const serial = String(d?.serial ?? '').trim();
+          return {
+            serial,
+            name: d?.name ? String(d.name).trim() : undefined,
+            ...(seen.get(serial) ? { lastSeenAt: seen.get(serial) } : {}),
+          };
+        })
         .filter((d) => d.serial);
       if (new Set(devices.map((d) => d.serial)).size !== devices.length) {
         throw new BadRequestException('Each device serial can be listed once');
@@ -296,6 +304,24 @@ export class CompaniesService {
         true,
       ),
     };
+  }
+
+  // When each machine's "last heard from" was last written, to write it at most once a minute
+  private deviceTouched = new Map<string, number>();
+
+  /** Notes that a clocking machine just talked to the server. */
+  async touchDevice(serial: string, now = new Date()) {
+    const last = this.deviceTouched.get(serial) ?? 0;
+    if (now.getTime() - last < 60_000) return;
+    this.deviceTouched.set(serial, now.getTime());
+    const result = await this.companyModel
+      .findOneAndUpdate(
+        { 'devices.serial': serial },
+        { $set: { 'devices.$.lastSeenAt': now } },
+      )
+      .select('_id')
+      .exec();
+    if (result) this.cache.delete(String(result._id));
   }
 
   /** Saves a company changed elsewhere (its subscription), and drops it from the cache. */

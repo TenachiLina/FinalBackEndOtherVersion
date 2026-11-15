@@ -392,6 +392,10 @@ const EXACT: Record<string, Tr> = {
     fr: 'Vous ne pouvez pas archiver votre propre fiche employé',
     ar: 'لا يمكنكم أرشفة ملفكم الوظيفي',
   },
+  'keys must be a list of notification keys': {
+    fr: 'keys doit être une liste de clés de notification',
+    ar: 'يجب أن تكون keys قائمة بمفاتيح الإشعارات',
+  },
   'empId must be an employee number': {
     fr: "empId doit être un numéro d'employé",
     ar: 'يجب أن يكون empId رقم موظف',
