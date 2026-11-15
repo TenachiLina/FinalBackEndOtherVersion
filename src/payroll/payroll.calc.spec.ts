@@ -152,7 +152,10 @@ describe('payLine', () => {
   ];
 
   it('gross = hours × hourly rate', () => {
-    const line = payLine({ baseSalary: 52000, rows, advances: 0, bonuses: 0 }, S);
+    const line = payLine(
+      { baseSalary: 52000, rows, advances: 0, bonuses: 0 },
+      S,
+    );
     expect(line.hourlyRate).toBe(250);
     expect(line.hours).toBe(16);
     expect(line.gross).toBe(4000);
@@ -167,7 +170,10 @@ describe('payLine', () => {
   });
 
   it('weekly advance offer = (gross − consumption) × ratio, penalties not deducted', () => {
-    const line = payLine({ baseSalary: 52000, rows, advances: 0, bonuses: 0 }, S);
+    const line = payLine(
+      { baseSalary: 52000, rows, advances: 0, bonuses: 0 },
+      S,
+    );
     expect(line.advanceOffer).toBe((4000 - 300) * 0.5);
     const none = payLine(
       { baseSalary: 52000, rows, advances: 0, bonuses: 0 },
@@ -270,15 +276,15 @@ describe('payTotals', () => {
 
 describe('payslipAmounts', () => {
   it('uses the declared salary when it is set', () => {
-    expect(payslipAmounts({ baseSalary: 45000, declaredSalary: 30000 })).toEqual(
-      {
-        days: 30,
-        baseSalary: 30000,
-        postSalary: 30000,
-        socialSecurity: 2700,
-        net: 27300,
-      },
-    );
+    expect(
+      payslipAmounts({ baseSalary: 45000, declaredSalary: 30000 }),
+    ).toEqual({
+      days: 30,
+      baseSalary: 30000,
+      postSalary: 30000,
+      socialSecurity: 2700,
+      net: 27300,
+    });
   });
 
   it('falls back to the base salary', () => {
@@ -293,7 +299,9 @@ describe('payslipAmounts', () => {
   });
 
   it('a declared salary of 0 is a real value', () => {
-    expect(payslipAmounts({ baseSalary: 45000, declaredSalary: 0 }).net).toBe(0);
+    expect(payslipAmounts({ baseSalary: 45000, declaredSalary: 0 }).net).toBe(
+      0,
+    );
   });
 
   it('rounds the social security to two decimals', () => {

@@ -14,12 +14,15 @@ beforeAll(async () => {
 });
 afterAll(() => t.close());
 
-const CLOSED = 'This month is closed: its hours and pay can no longer be changed';
+const CLOSED =
+  'This month is closed: its hours and pay can no longer be changed';
 
 // Months around today, so the tests don't depend on the date they run
 const now = new Date();
 const monthAt = (offset: number) => {
-  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offset, 1));
+  const d = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offset, 1),
+  );
   return d.toISOString().slice(0, 7);
 };
 // Two months back: over in every time zone, even on the 1st of the month
@@ -49,7 +52,9 @@ async function setup(settings?: Record<string, unknown>) {
     work_date: day(PAST),
     work_hours: '08:00',
   });
-  const adminUser = await seed.user('admin', company.id, { name: 'Nadia Admin' });
+  const adminUser = await seed.user('admin', company.id, {
+    name: 'Nadia Admin',
+  });
   const admin = await loginAs(t, adminUser);
   const manager = await loginAs(t, await seed.user('manager', company.id));
   return { company, amine, work, admin, manager };
@@ -88,15 +93,34 @@ describe('the state of a month', () => {
     const res = await admin.get(`/payroll/closings?year=${year}`);
     expect(res.status).toBe(200);
     expect(res.body.map((m: any) => m.month)).toEqual(
-      Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, '0')}`),
+      Array.from(
+        { length: 12 },
+        (_, i) => `${year}-${String(i + 1).padStart(2, '0')}`,
+      ),
     );
   });
 
   it.each([
-    ['get', '/payroll/closings/2026-13', 'month must be YYYY-MM (e.g. 2026-11)'],
-    ['get', '/payroll/closings/october', 'month must be YYYY-MM (e.g. 2026-11)'],
-    ['post', '/payroll/closings/2026-1/close', 'month must be YYYY-MM (e.g. 2026-11)'],
-    ['post', '/payroll/closings/x/reopen', 'month must be YYYY-MM (e.g. 2026-11)'],
+    [
+      'get',
+      '/payroll/closings/2026-13',
+      'month must be YYYY-MM (e.g. 2026-11)',
+    ],
+    [
+      'get',
+      '/payroll/closings/october',
+      'month must be YYYY-MM (e.g. 2026-11)',
+    ],
+    [
+      'post',
+      '/payroll/closings/2026-1/close',
+      'month must be YYYY-MM (e.g. 2026-11)',
+    ],
+    [
+      'post',
+      '/payroll/closings/x/reopen',
+      'month must be YYYY-MM (e.g. 2026-11)',
+    ],
     ['get', '/payroll/closings', 'year must be a year (e.g. 2026)'],
     ['get', '/payroll/closings?year=26', 'year must be a year (e.g. 2026)'],
   ] as const)('%s %s → 400', async (method, url, message) => {
@@ -119,18 +143,29 @@ describe('closing a month by hand', () => {
       closedBy: 'Nadia Admin',
       canClose: false,
     });
-    expect(new Date(res.body.closedAt).getTime()).toBeGreaterThan(Date.now() - 60_000);
+    expect(new Date(res.body.closedAt).getTime()).toBeGreaterThan(
+      Date.now() - 60_000,
+    );
     const status = await admin.get(`/payroll/closings/${PAST}`);
-    expect(status.body).toMatchObject({ closed: true, closedBy: 'Nadia Admin' });
+    expect(status.body).toMatchObject({
+      closed: true,
+      closedBy: 'Nadia Admin',
+    });
   });
 
   it('a manager sees the state but can neither close nor reopen', async () => {
     const { admin, manager } = await setup();
     expect((await manager.get(`/payroll/closings/${PAST}`)).status).toBe(200);
-    expect((await manager.post(`/payroll/closings/${PAST}/close`)).status).toBe(403);
+    expect((await manager.post(`/payroll/closings/${PAST}/close`)).status).toBe(
+      403,
+    );
     await admin.post(`/payroll/closings/${PAST}/close`);
-    expect((await manager.post(`/payroll/closings/${PAST}/reopen`)).status).toBe(403);
-    expect((await admin.get(`/payroll/closings/${PAST}`)).body.closed).toBe(true);
+    expect(
+      (await manager.post(`/payroll/closings/${PAST}/reopen`)).status,
+    ).toBe(403);
+    expect((await admin.get(`/payroll/closings/${PAST}`)).body.closed).toBe(
+      true,
+    );
   });
 
   it("can't be closed twice", async () => {
@@ -145,7 +180,9 @@ describe('closing a month by hand', () => {
     const a = await setup();
     const b = await setup();
     await a.admin.post(`/payroll/closings/${PAST}/close`);
-    expect((await b.admin.get(`/payroll/closings/${PAST}`)).body.closed).toBe(false);
+    expect((await b.admin.get(`/payroll/closings/${PAST}`)).body.closed).toBe(
+      false,
+    );
     const res = await b.admin.post('/worktime').send({
       emp_id: 1,
       work_date: day(PAST, 6).toISOString(),
@@ -186,7 +223,9 @@ describe('a closed month is locked', () => {
 
   it('no work time can be changed or deleted', async () => {
     const { admin, work, company } = await closed();
-    const put = await admin.put(`/worktime/${work._id}`).send({ work_hours: '12:00' });
+    const put = await admin
+      .put(`/worktime/${work._id}`)
+      .send({ work_hours: '12:00' });
     expect(put.status).toBe(409);
     expect(put.body.message).toBe(CLOSED);
     const del = await admin.delete(`/worktime/${work._id}`);
@@ -223,9 +262,12 @@ describe('a closed month is locked', () => {
 
   it('no bonus can be given or removed', async () => {
     const { admin, bonus, company } = await closed();
-    const post = await admin
-      .post('/bonuses')
-      .send({ emp_id: 1, amount: 100, date: `${PAST}-15`, reason: 'Late bonus' });
+    const post = await admin.post('/bonuses').send({
+      emp_id: 1,
+      amount: 100,
+      date: `${PAST}-15`,
+      reason: 'Late bonus',
+    });
     expect(post.status).toBe(409);
     expect(post.body.message).toBe(CLOSED);
     const del = await admin.delete(`/bonuses/${bonus._id}`);
@@ -268,7 +310,9 @@ describe('the payroll of a closed month is frozen', () => {
     const { admin, amine } = await setup();
     await admin.post(`/payroll/closings/${PAST}/close`);
     // A raise decided later must not rewrite a month already paid
-    const raise = await admin.put(`/employees/${amine._id}`).send({ baseSalary: 104000 });
+    const raise = await admin
+      .put(`/employees/${amine._id}`)
+      .send({ baseSalary: 104000 });
     expect(raise.status).toBe(200);
 
     const frozen = await admin.get(wholeMonth(PAST));
@@ -283,7 +327,11 @@ describe('the payroll of a closed month is frozen', () => {
       gross: 2000,
       net: 2000,
     });
-    expect(frozen.body.totals).toMatchObject({ gross: 2000, net: 2000, employees: 1 });
+    expect(frozen.body.totals).toMatchObject({
+      gross: 2000,
+      net: 2000,
+      employees: 1,
+    });
   });
 
   it('an open month is calculated live and says so', async () => {
@@ -313,13 +361,18 @@ describe('the payroll of a closed month is frozen', () => {
 
   it("hides the other managers from a manager's frozen month", async () => {
     const { admin, company, amine } = await setup();
-    const sara = await seed.employee(company.id, { empNumber: 2, baseSalary: 26000 });
+    const sara = await seed.employee(company.id, {
+      empNumber: 2,
+      baseSalary: 26000,
+    });
     await seed.worktime(company.id, {
       emp_id: 2,
       work_date: day(PAST),
       work_hours: '04:00',
     });
-    const me = await seed.user('manager', company.id, { employeeId: String(amine._id) });
+    const me = await seed.user('manager', company.id, {
+      employeeId: String(amine._id),
+    });
     await seed.user('manager', company.id, { employeeId: String(sara._id) });
     await admin.post(`/payroll/closings/${PAST}/close`);
     const res = await (await loginAs(t, me)).get(wholeMonth(PAST));
@@ -334,7 +387,10 @@ describe('the payroll of a closed month is frozen', () => {
     await admin.put(`/employees/${amine._id}`).send({ baseSalary: 104000 });
     const frozen = await admin.get(`/payroll/payslips?month=${PAST}`);
     expect(frozen.body.closed).toBe(true);
-    expect(frozen.body.payslips[0]).toMatchObject({ baseSalary: 52000, net: 47320 });
+    expect(frozen.body.payslips[0]).toMatchObject({
+      baseSalary: 52000,
+      net: 47320,
+    });
     const live = await admin.get(`/payroll/payslips?month=${OLDER}`);
     expect(live.body.closed).toBe(false);
     expect(live.body.payslips[0]).toMatchObject({ baseSalary: 104000 });
@@ -353,7 +409,9 @@ describe('reopening a month', () => {
       reopenedBy: 'Nadia Admin',
       canClose: true,
     });
-    const put = await admin.put(`/worktime/${work._id}`).send({ work_hours: '06:00' });
+    const put = await admin
+      .put(`/worktime/${work._id}`)
+      .send({ work_hours: '06:00' });
     expect(put.status).toBe(200);
     const live = await admin.get(wholeMonth(PAST));
     expect(live.body.closed).toBe(false);
@@ -449,11 +507,19 @@ describe('closing by itself after the company delay', () => {
 
   it('a reopened month stays open until an admin closes it again', async () => {
     const { admin, work } = await setup({ monthCloseDelayDays: 0 });
-    expect((await admin.get(`/payroll/closings/${PAST}`)).body.closed).toBe(true);
+    expect((await admin.get(`/payroll/closings/${PAST}`)).body.closed).toBe(
+      true,
+    );
     await admin.post(`/payroll/closings/${PAST}/reopen`);
     const status = await admin.get(`/payroll/closings/${PAST}`);
-    expect(status.body).toMatchObject({ closed: false, closesAt: null, canClose: true });
-    const put = await admin.put(`/worktime/${work._id}`).send({ work_hours: '06:00' });
+    expect(status.body).toMatchObject({
+      closed: false,
+      closesAt: null,
+      canClose: true,
+    });
+    const put = await admin
+      .put(`/worktime/${work._id}`)
+      .send({ work_hours: '06:00' });
     expect(put.status).toBe(200);
   });
 });
@@ -461,23 +527,33 @@ describe('closing by itself after the company delay', () => {
 describe('the company setting', () => {
   it('an admin sets the days before a month closes', async () => {
     const { admin } = await setup();
-    const res = await admin.patch('/company').send({ settings: { monthCloseDelayDays: 7 } });
+    const res = await admin
+      .patch('/company')
+      .send({ settings: { monthCloseDelayDays: 7 } });
     expect(res.status).toBe(200);
     expect(res.body.settings.monthCloseDelayDays).toBe(7);
-    expect((await admin.get(`/payroll/closings/${PAST}`)).body.closed).toBe(true);
+    expect((await admin.get(`/payroll/closings/${PAST}`)).body.closed).toBe(
+      true,
+    );
   });
 
   it('empty switches automatic closing off', async () => {
     const { admin } = await setup({ monthCloseDelayDays: 7 });
-    const res = await admin.patch('/company').send({ settings: { monthCloseDelayDays: '' } });
+    const res = await admin
+      .patch('/company')
+      .send({ settings: { monthCloseDelayDays: '' } });
     expect(res.status).toBe(200);
     expect(res.body.settings.monthCloseDelayDays).toBeNull();
-    expect((await admin.get(`/payroll/closings/${OLDER}`)).body.closesAt).toBeNull();
+    expect(
+      (await admin.get(`/payroll/closings/${OLDER}`)).body.closesAt,
+    ).toBeNull();
   });
 
   it.each([-1, 366, 2.5, 'soon'])('refuses %p', async (value) => {
     const { admin } = await setup();
-    const res = await admin.patch('/company').send({ settings: { monthCloseDelayDays: value } });
+    const res = await admin
+      .patch('/company')
+      .send({ settings: { monthCloseDelayDays: value } });
     expect(res.status).toBe(400);
     expect(res.body.message).toBe(
       'Days before a month closes must be a whole number between 0 and 365',

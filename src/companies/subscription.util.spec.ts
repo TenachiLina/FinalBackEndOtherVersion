@@ -34,7 +34,12 @@ describe('subscriptionState', () => {
   it('a paid period with more than 7 days left shows nothing', () => {
     expect(
       subscriptionState(
-        { status: 'active', endsAt: inDays(30), packName: 'Pro', maxEmployees: 50 },
+        {
+          status: 'active',
+          endsAt: inDays(30),
+          packName: 'Pro',
+          maxEmployees: 50,
+        },
         NOW,
       ),
     ).toEqual({
@@ -50,7 +55,9 @@ describe('subscriptionState', () => {
   });
 
   it('warns from 7 days before the end', () => {
-    expect(subscriptionState({ endsAt: inDays(8) }, NOW).endingSoon).toBe(false);
+    expect(subscriptionState({ endsAt: inDays(8) }, NOW).endingSoon).toBe(
+      false,
+    );
     expect(subscriptionState({ endsAt: inDays(7) }, NOW)).toMatchObject({
       endingSoon: true,
       daysLeft: 7,
@@ -113,14 +120,25 @@ describe('dates', () => {
   it('isIsoDate accepts real calendar days only', () => {
     expect(isIsoDate('2026-11-14')).toBe(true);
     expect(isIsoDate('2028-02-29')).toBe(true);
-    for (const bad of ['2026-02-30', '2026-13-01', '14/11/2026', '', null, 20261114]) {
+    for (const bad of [
+      '2026-02-30',
+      '2026-13-01',
+      '14/11/2026',
+      '',
+      null,
+      20261114,
+    ]) {
       expect(isIsoDate(bad)).toBe(false);
     }
   });
 
   it('a subscription runs from the first to the last moment of its days', () => {
-    expect(startOfDay('2026-11-14').toISOString()).toBe('2026-11-14T00:00:00.000Z');
-    expect(endOfDay('2026-11-14').toISOString()).toBe('2026-11-14T23:59:59.999Z');
+    expect(startOfDay('2026-11-14').toISOString()).toBe(
+      '2026-11-14T00:00:00.000Z',
+    );
+    expect(endOfDay('2026-11-14').toISOString()).toBe(
+      '2026-11-14T23:59:59.999Z',
+    );
   });
 
   it('addDays', () => {
@@ -130,9 +148,9 @@ describe('dates', () => {
   });
 
   it('addMonths keeps the day of the month', () => {
-    expect(addMonths(new Date('2026-11-14T23:59:59.999Z'), 1).toISOString()).toBe(
-      '2026-12-14T23:59:59.999Z',
-    );
+    expect(
+      addMonths(new Date('2026-11-14T23:59:59.999Z'), 1).toISOString(),
+    ).toBe('2026-12-14T23:59:59.999Z');
     expect(addMonths(new Date('2026-11-14T00:00:00Z'), 12).toISOString()).toBe(
       '2027-11-14T00:00:00.000Z',
     );
@@ -153,18 +171,20 @@ describe('dates', () => {
 
 describe('extendedEnd', () => {
   it('adds the months after the current end while the subscription runs', () => {
-    expect(extendedEnd(new Date('2026-12-01T23:59:59.999Z'), 3, NOW).toISOString()).toBe(
-      '2027-03-01T23:59:59.999Z',
-    );
+    expect(
+      extendedEnd(new Date('2026-12-01T23:59:59.999Z'), 3, NOW).toISOString(),
+    ).toBe('2027-03-01T23:59:59.999Z');
   });
 
   it('starts from today when the subscription has already ended', () => {
-    expect(extendedEnd(new Date('2026-10-01T00:00:00Z'), 1, NOW).toISOString()).toBe(
-      '2026-12-14T10:00:00.000Z',
-    );
+    expect(
+      extendedEnd(new Date('2026-10-01T00:00:00Z'), 1, NOW).toISOString(),
+    ).toBe('2026-12-14T10:00:00.000Z');
   });
 
   it('starts from today without a current end', () => {
-    expect(extendedEnd(null, 2, NOW).toISOString()).toBe('2027-01-14T10:00:00.000Z');
+    expect(extendedEnd(null, 2, NOW).toISOString()).toBe(
+      '2027-01-14T10:00:00.000Z',
+    );
   });
 });

@@ -16,12 +16,18 @@ describe('isMonth', () => {
     expect(isMonth(m)).toBe(true);
   });
 
-  it.each(['2026-13', '2026-00', '2026-1', '26-01', '2026/01', '', null, 202601])(
-    'refuses %p',
-    (m) => {
-      expect(isMonth(m)).toBe(false);
-    },
-  );
+  it.each([
+    '2026-13',
+    '2026-00',
+    '2026-1',
+    '26-01',
+    '2026/01',
+    '',
+    null,
+    202601,
+  ])('refuses %p', (m) => {
+    expect(isMonth(m)).toBe(false);
+  });
 });
 
 describe('offsetMinutes', () => {
