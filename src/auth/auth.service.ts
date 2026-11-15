@@ -10,6 +10,7 @@ import * as bcrypt from 'bcryptjs';
 import { UsersService } from './users.service';
 import { CompaniesService } from '../companies/companies.service';
 import type { CompanyDocument } from '../companies/company.schema';
+import { subscriptionState } from '../companies/subscription.util';
 import type { UserDocument } from './user.schema';
 import type { AuthUser } from './auth.decorators';
 import { SessionsService } from './sessions.service';
@@ -46,7 +47,21 @@ export function toCompanyInfo(company: CompanyDocument | null) {
     branding: company.branding ?? {},
     active: company.active,
     features: company.features,
+    // Pages switched off inside those features
+    disabledPages: company.disabledPages ?? [],
     settings: company.settings,
+    // Where the subscription stands: the app warns before the end and shows
+    // read-only after it. No prices or payments here.
+    subscription: subscriptionState(company.subscription),
+  };
+}
+
+/** A company as the super admin sees it: everything, plus where its subscription stands. */
+export function toCompanySummary(company: CompanyDocument) {
+  return {
+    ...company.toObject(),
+    id: String(company._id),
+    subscriptionState: subscriptionState(company.subscription),
   };
 }
 

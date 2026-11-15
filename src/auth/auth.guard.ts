@@ -14,8 +14,10 @@ import {
   IS_PUBLIC_KEY,
   KIOSK_KEY,
   NO_COMPANY_KEY,
+  PAGE_KEY,
   ROLES_KEY,
   STAFF_KEY,
+  WHEN_EXPIRED_KEY,
 } from './auth.decorators';
 import type { AuthUser, Role } from './auth.decorators';
 import { SessionsService } from './sessions.service';
@@ -25,6 +27,7 @@ import { AUTH_CODES } from './security.config';
 import { clientInfo } from './client-info';
 import { CompaniesService } from '../companies/companies.service';
 import type { Feature } from '../companies/company.schema';
+import { subscriptionState } from '../companies/subscription.util';
 import { setCurrentCompany } from '../tenancy/tenant-context';
 
 /**
@@ -38,6 +41,8 @@ import { setCurrentCompany } from '../tenancy/tenant-context';
  * 4. checks the company is active and has the route's feature switched on
  * 5. checks the user's role (kiosk and staff accounts only reach the routes
  *    marked for them)
+ * 6. checks the page the route belongs to is not switched off, and refuses
+ *    changes once the company's subscription has ended (read-only)
  */
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -141,6 +146,25 @@ export class AuthGuard implements CanActivate {
     if (feature && company && !company.features.includes(feature)) {
       throw new ForbiddenException(
         `The "${feature}" feature is not enabled for this company`,
+      );
+    }
+
+    const page = meta<string>(PAGE_KEY);
+    if (page && company && (company.disabledPages ?? []).includes(page)) {
+      throw new ForbiddenException('This page is not enabled for this company');
+    }
+
+    // After the end of the subscription the company can still see and export
+    // everything, but change nothing. The super admin still can, to fix things.
+    if (
+      company &&
+      user.role !== 'superadmin' &&
+      !['GET', 'HEAD', 'OPTIONS'].includes(String(request.method).toUpperCase()) &&
+      !meta<boolean>(WHEN_EXPIRED_KEY) &&
+      subscriptionState(company.subscription).readOnly
+    ) {
+      throw new ForbiddenException(
+        'Your subscription has ended: the account is read-only until it is renewed',
       );
     }
 

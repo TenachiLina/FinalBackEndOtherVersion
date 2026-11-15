@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Employee, EmployeeDocument } from './employee.shema';
@@ -9,6 +13,16 @@ export class EmployeesService {
 
   async create(data: Partial<Employee>): Promise<EmployeeDocument> {
     return this.employeeModel.create(data);
+  }
+
+  /** Refuses a new employee once the company's pack is full. `max` null: no limit. */
+  async assertRoomFor(max: number | null | undefined) {
+    if (!max || max <= 0) return;
+    if ((await this.employeeModel.countDocuments({})) >= max) {
+      throw new ForbiddenException(
+        'Your pack is full: it has no room for another employee. Contact us to upgrade',
+      );
+    }
   }
 
   async findAll(): Promise<EmployeeDocument[]> {

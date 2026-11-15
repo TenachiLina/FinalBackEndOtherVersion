@@ -7,8 +7,10 @@ import {
   Delete,
   Param,
   Body,
+  Req,
 } from '@nestjs/common';
 import { EmployeesService } from './employees.service';
+import { subscriptionState } from '../companies/subscription.util';
 import { ManagerVisibilityService } from './manager-visibility.service';
 import { CurrentUser, Roles } from '../auth/auth.decorators';
 import type { AuthUser } from '../auth/auth.decorators';
@@ -45,7 +47,13 @@ export class EmployeesController {
     }
   }
 
-  @Roles('admin', 'manager') @Post() create(@Body() body: any) {
+  @Roles('admin', 'manager') @Post() async create(
+    @Req() req: { company?: { subscription?: any } | null },
+    @Body() body: any,
+  ) {
+    await this.employeesService.assertRoomFor(
+      subscriptionState(req.company?.subscription).maxEmployees,
+    );
     return this.employeesService.create(body);
   }
   @Get() async findAll(@CurrentUser() user: AuthUser) {

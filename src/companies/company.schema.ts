@@ -62,6 +62,36 @@ export class CompanyBranding {
 export const CompanyBrandingSchema =
   SchemaFactory.createForClass(CompanyBranding);
 
+export interface SubscriptionPayment {
+  _id: unknown;
+  date: string; // "YYYY-MM-DD"
+  amount: number;
+  method?: string;
+  reference?: string;
+  note?: string;
+  // Months this payment added to the subscription
+  months: number;
+  recordedBy: string;
+  recordedAt: Date;
+}
+
+export interface CompanySubscription {
+  packId: unknown;
+  packName: string;
+  // A trial or a paid period; "expired" is worked out from endsAt
+  status: 'trial' | 'active';
+  startsAt: Date;
+  // The subscription runs through this moment
+  endsAt: Date;
+  // null: no limit
+  maxEmployees: number | null;
+  price: number | null;
+  currency: string | null;
+  periodMonths: number | null;
+  note?: string;
+  payments: SubscriptionPayment[];
+}
+
 export type CompanyDocument = Company & Document;
 
 // Not tenant-scoped: companies are managed by the super admin.
@@ -79,6 +109,14 @@ export class Company {
   settings!: CompanySettings;
   @Prop({ type: [CompanyDeviceSchema], default: [] })
   devices!: CompanyDevice[];
+
+  // Pages switched off one by one inside the features above (see pages.ts)
+  @Prop({ type: [String], default: [] }) disabledPages!: string[];
+
+  // The pack the company has, until when, and the payments recorded for it
+  // (see SubscriptionsService). Null: no end date and no limit.
+  @Prop({ type: Object, default: null })
+  subscription!: CompanySubscription | null;
 }
 
 export const CompanySchema = SchemaFactory.createForClass(Company);

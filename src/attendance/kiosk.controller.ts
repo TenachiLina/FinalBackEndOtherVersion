@@ -10,7 +10,8 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { KioskAllowed, RequireFeature, Roles } from '../auth/auth.decorators';
+import { KioskAllowed, RequireFeature,
+  RequirePage, Roles } from '../auth/auth.decorators';
 import { Employee, EmployeeDocument } from '../employees/employee.shema';
 import {
   RawAttendanceLog,
@@ -58,6 +59,7 @@ const formatMin = (n: number) =>
 @KioskAllowed()
 @Roles('admin', 'manager', 'employee')
 @RequireFeature('clockin')
+@RequirePage('kiosk')
 @Controller('kiosk')
 export class KioskController {
   private readonly logger = new Logger(KioskController.name);

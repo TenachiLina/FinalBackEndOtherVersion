@@ -27,6 +27,8 @@ import {
 } from './companies.controller';
 import { CompaniesModule } from '../companies/companies.module';
 
+import { PacksController, SubscriptionsController } from './billing.controller';
+
 @Module({
   imports: [
     CompaniesModule,
@@ -78,6 +80,8 @@ import { CompaniesModule } from '../companies/companies.module';
     OwnCompanyController,
     BrandingController,
     SessionsController,
+    PacksController,
+    SubscriptionsController,
   ],
   providers: [
     UsersService,

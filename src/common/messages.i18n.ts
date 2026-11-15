@@ -267,6 +267,114 @@ const EXACT: Record<string, Tr> = {
     fr: 'Le nombre de jours avant la clôture doit être un entier entre 0 et 365',
     ar: 'يجب أن يكون عدد الأيام قبل إغلاق الشهر عددًا صحيحًا بين 0 و 365',
   },
+  'This page is not enabled for this company': {
+    fr: "Cette page n'est pas activée pour cette entreprise",
+    ar: 'هذه الصفحة غير مفعّلة لهذه الشركة',
+  },
+  'Your subscription has ended: the account is read-only until it is renewed': {
+    fr: "Votre abonnement est terminé : le compte est en lecture seule jusqu'à son renouvellement",
+    ar: 'انتهى اشتراككم: الحساب للقراءة فقط إلى أن يُجدَّد',
+  },
+  'Your pack is full: it has no room for another employee. Contact us to upgrade': {
+    fr: "Votre pack est complet : il n'y a plus de place pour un autre employé. Contactez-nous pour passer au pack supérieur",
+    ar: 'باقتكم ممتلئة: لا يوجد مكان لموظف آخر. اتصلوا بنا للترقية',
+  },
+  'Pack not found': {
+    fr: 'Pack introuvable',
+    ar: 'الباقة غير موجودة',
+  },
+  'This pack is used by a company: archive it instead of deleting it': {
+    fr: 'Ce pack est utilisé par une entreprise : archivez-le au lieu de le supprimer',
+    ar: 'هذه الباقة مستخدمة من طرف شركة: أرشفوها بدل حذفها',
+  },
+  'Pack name is required': {
+    fr: 'Le nom du pack est obligatoire',
+    ar: 'اسم الباقة مطلوب',
+  },
+  'Pack name must be at most 60 characters': {
+    fr: 'Le nom du pack ne peut pas dépasser 60 caractères',
+    ar: 'يجب ألا يتجاوز اسم الباقة 60 حرفًا',
+  },
+  'Description must be at most 300 characters': {
+    fr: 'La description ne peut pas dépasser 300 caractères',
+    ar: 'يجب ألا يتجاوز الوصف 300 حرف',
+  },
+  'Price must be 0 or more': {
+    fr: 'Le prix doit être supérieur ou égal à 0',
+    ar: 'يجب أن يكون السعر 0 أو أكثر',
+  },
+  'Billing period must be 1 to 36 months': {
+    fr: 'La période de facturation doit être de 1 à 36 mois',
+    ar: 'يجب أن تكون فترة الفوترة من 1 إلى 36 شهرًا',
+  },
+  'Unknown page': {
+    fr: 'Page inconnue',
+    ar: 'صفحة غير معروفة',
+  },
+  'Employee limit must be a whole number, or empty for no limit': {
+    fr: "La limite d'employés doit être un nombre entier, ou vide pour aucune limite",
+    ar: 'يجب أن يكون حد الموظفين عددًا صحيحًا، أو فارغًا لعدم التحديد',
+  },
+  'Trial length must be 0 to 365 days': {
+    fr: "La durée de l'essai doit être de 0 à 365 jours",
+    ar: 'يجب أن تكون مدة التجربة من 0 إلى 365 يومًا',
+  },
+  'Trial length must be 1 to 365 days': {
+    fr: "La durée de l'essai doit être de 1 à 365 jours",
+    ar: 'يجب أن تكون مدة التجربة من 1 إلى 365 يومًا',
+  },
+  'A pack with this name already exists': {
+    fr: 'Un pack portant ce nom existe déjà',
+    ar: 'توجد باقة بهذا الاسم بالفعل',
+  },
+  'Choose a trial or a paid subscription': {
+    fr: 'Choisissez un essai ou un abonnement payant',
+    ar: 'اختاروا تجربة أو اشتراكًا مدفوعًا',
+  },
+  'This pack is archived: choose another one': {
+    fr: 'Ce pack est archivé : choisissez-en un autre',
+    ar: 'هذه الباقة مؤرشفة: اختاروا باقة أخرى',
+  },
+  'Choose a pack': {
+    fr: 'Choisissez un pack',
+    ar: 'اختاروا باقة',
+  },
+  'Start date must be YYYY-MM-DD': {
+    fr: 'La date de début doit être au format AAAA-MM-JJ',
+    ar: 'يجب أن يكون تاريخ البداية بصيغة YYYY-MM-DD',
+  },
+  'End date must be YYYY-MM-DD': {
+    fr: 'La date de fin doit être au format AAAA-MM-JJ',
+    ar: 'يجب أن يكون تاريخ النهاية بصيغة YYYY-MM-DD',
+  },
+  'Months must be 1 to 36': {
+    fr: 'Le nombre de mois doit être de 1 à 36',
+    ar: 'يجب أن يكون عدد الأشهر من 1 إلى 36',
+  },
+  'Months must be 0 to 36': {
+    fr: 'Le nombre de mois doit être de 0 à 36',
+    ar: 'يجب أن يكون عدد الأشهر من 0 إلى 36',
+  },
+  'The end date must be on or after the start': {
+    fr: 'La date de fin doit être égale ou postérieure au début',
+    ar: 'يجب أن يكون تاريخ النهاية في يوم البداية أو بعده',
+  },
+  'Give this company a pack before recording a payment': {
+    fr: "Attribuez un pack à cette entreprise avant d'enregistrer un paiement",
+    ar: 'امنحوا هذه الشركة باقة قبل تسجيل دفعة',
+  },
+  'Note must be at most 300 characters': {
+    fr: 'La note ne peut pas dépasser 300 caractères',
+    ar: 'يجب ألا تتجاوز الملاحظة 300 حرف',
+  },
+  'Payment method must be at most 40 characters': {
+    fr: 'Le mode de paiement ne peut pas dépasser 40 caractères',
+    ar: 'يجب ألا تتجاوز طريقة الدفع 40 حرفًا',
+  },
+  'Reference must be at most 80 characters': {
+    fr: 'La référence ne peut pas dépasser 80 caractères',
+    ar: 'يجب ألا يتجاوز المرجع 80 حرفًا',
+  },
   'empId must be an employee number': {
     fr: "empId doit être un numéro d'employé",
     ar: 'يجب أن يكون empId رقم موظف',

@@ -15,8 +15,11 @@ import {
   Feature,
   FEATURES,
 } from './company.schema';
+import { cleanPages } from './pages';
 
 export interface CompanyInput {
+  // Pages switched off inside the company's features (see pages.ts)
+  disabledPages?: unknown;
   name?: string;
   active?: boolean;
   features?: Feature[];
@@ -123,6 +126,11 @@ export class CompaniesService {
       company.name = name;
     }
     if (input.active !== undefined) company.active = Boolean(input.active);
+    if (input.disabledPages !== undefined) {
+      const pages = cleanPages(input.disabledPages);
+      if (!pages) throw new BadRequestException('Unknown page');
+      company.disabledPages = pages;
+    }
     if (input.features !== undefined) {
       if (
         !Array.isArray(input.features) ||
@@ -288,6 +296,11 @@ export class CompaniesService {
         true,
       ),
     };
+  }
+
+  /** Saves a company changed elsewhere (its subscription), and drops it from the cache. */
+  persist(company: CompanyDocument) {
+    return this.save(company);
   }
 
   private async save(company: CompanyDocument) {

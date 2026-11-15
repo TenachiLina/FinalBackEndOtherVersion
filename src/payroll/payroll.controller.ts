@@ -1,5 +1,10 @@
 import { Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
-import { CurrentUser, RequireFeature, Roles } from '../auth/auth.decorators';
+import {
+  CurrentUser,
+  RequireFeature,
+  RequirePage,
+  Roles,
+} from '../auth/auth.decorators';
 import type { AuthUser } from '../auth/auth.decorators';
 import { MonthClosingService } from './month-closing.service';
 import { PayrollService } from './payroll.service';
@@ -44,6 +49,7 @@ export class PayrollController {
   }
 
   /** GET /payroll/payslips?month=YYYY-MM: the amounts of each fiche de paie. */
+  @RequirePage('payslips')
   @Get('payslips')
   async payslips(@CurrentUser() user: AuthUser, @Query('month') month: unknown) {
     const range = this.payroll.month(month);

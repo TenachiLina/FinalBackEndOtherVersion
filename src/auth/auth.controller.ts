@@ -13,6 +13,7 @@ import { AuthService, toCompanyInfo } from './auth.service';
 import { SessionsService } from './sessions.service';
 import {
   AllowNoCompany,
+  AllowWhenExpired,
   CurrentUser,
   KioskAllowed,
   Public,
@@ -25,6 +26,7 @@ import { clientInfo } from './client-info';
 @AllowNoCompany()
 @KioskAllowed()
 @StaffAllowed()
+@AllowWhenExpired()
 @Controller('auth')
 export class AuthController {
   constructor(

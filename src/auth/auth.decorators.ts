@@ -4,6 +4,7 @@ import {
   SetMetadata,
 } from '@nestjs/common';
 import type { Feature } from '../companies/company.schema';
+import type { Page } from '../companies/pages';
 
 // superadmin: the product owner; manages companies and has no company of its own.
 // admin / manager: users inside one company.
@@ -18,6 +19,8 @@ export const ROLES_KEY = 'roles';
 export const FEATURE_KEY = 'feature';
 export const NO_COMPANY_KEY = 'noCompany';
 export const KIOSK_KEY = 'kioskAllowed';
+export const PAGE_KEY = 'page';
+export const WHEN_EXPIRED_KEY = 'allowWhenExpired';
 export const STAFF_KEY = 'staffAllowed';
 
 // Skips authentication entirely (login, health check, attendance device).
@@ -32,6 +35,14 @@ export const Roles = (...roles: Role[]) => SetMetadata(ROLES_KEY, roles);
 // The route only works when the company has this feature switched on.
 export const RequireFeature = (feature: Feature) =>
   SetMetadata(FEATURE_KEY, feature);
+
+// The route belongs to one page: refused when the company has that page
+// switched off (company.disabledPages, see companies/pages.ts).
+export const RequirePage = (page: Page) => SetMetadata(PAGE_KEY, page);
+
+// The route still changes things after the company's subscription ended
+// (signing out, changing one's password). Everything else is read-only then.
+export const AllowWhenExpired = () => SetMetadata(WHEN_EXPIRED_KEY, true);
 
 // The route works without a company (e.g. a super admin's own account pages).
 export const AllowNoCompany = () => SetMetadata(NO_COMPANY_KEY, true);
