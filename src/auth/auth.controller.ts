@@ -5,12 +5,15 @@ import {
   Get,
   HttpCode,
   Param,
+  Patch,
   Post,
   Req,
 } from '@nestjs/common';
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { AuthService, toCompanyInfo } from './auth.service';
 import { SessionsService } from './sessions.service';
+import { UsersService } from './users.service';
+import type { ProfileInput } from './users.service';
 import {
   AllowNoCompany,
   AllowWhenExpired,
@@ -32,6 +35,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly sessions: SessionsService,
+    private readonly usersService: UsersService,
   ) {}
 
   // Stricter limit than the rest of the API: slows down password guessing
@@ -55,8 +59,20 @@ export class AuthController {
 
   @SkipThrottle()
   @Get('me')
-  me(@CurrentUser() user: AuthUser, @Req() req: { company?: any }) {
-    return { user, company: toCompanyInfo(req.company ?? null) };
+  async me(@CurrentUser() user: AuthUser, @Req() req: { company?: any }) {
+    const account = await this.usersService.findById(user.id);
+    return {
+      // The company a super admin works in comes from the request, not the account
+      user: { ...user, photo: account?.photo || null },
+      company: toCompanyInfo(req.company ?? null),
+    };
+  }
+
+  /** Changes one's own name and photo (not the email, role or company). */
+  @Patch('me')
+  async updateMe(@CurrentUser() user: AuthUser, @Body() body: ProfileInput) {
+    const saved = await this.usersService.updateOwnProfile(user.id, body ?? {});
+    return { user: { ...user, name: saved.name, photo: saved.photo || null } };
   }
 
   /** Ends this session: its tokens stop working at once. */

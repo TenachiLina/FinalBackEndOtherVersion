@@ -43,6 +43,15 @@ export interface UpdateUserInput {
   archived?: boolean;
 }
 
+export interface ProfileInput {
+  name?: unknown;
+  /** A data URL, or "" / null to remove the photo */
+  photo?: unknown;
+}
+
+const PHOTO_RE = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/;
+const MAX_PHOTO_CHARS = 280_000; // ~200 KB image
+
 /**
  * Company users. Every method takes the company it works in, so an admin of
  * one company can never read or change another company's users.
@@ -144,6 +153,39 @@ export class UsersService {
       .find(this.inCompany(companyId))
       .sort({ createdAt: 1 })
       .exec();
+  }
+
+  /**
+   * What someone may change about their own account: their name and photo.
+   * The email, role and company stay with the admin.
+   */
+  async updateOwnProfile(id: string, input: ProfileInput): Promise<UserDocument> {
+    const user = await this.findById(id);
+    if (!user) throw new NotFoundException('User not found');
+    if (input.name !== undefined) {
+      const name = typeof input.name === 'string' ? input.name.trim() : '';
+      if (!name) throw new BadRequestException('Name is required');
+      if (name.length > 80) {
+        throw new BadRequestException('Name must be at most 80 characters');
+      }
+      user.name = name;
+    }
+    if (input.photo !== undefined) {
+      if (input.photo === null || input.photo === '') {
+        user.photo = undefined;
+      } else if (
+        typeof input.photo !== 'string' ||
+        !PHOTO_RE.test(input.photo) ||
+        input.photo.length > MAX_PHOTO_CHARS
+      ) {
+        throw new BadRequestException(
+          'The photo must be a PNG, JPEG or WebP image of at most 200 KB',
+        );
+      } else {
+        user.photo = input.photo;
+      }
+    }
+    return user.save();
   }
 
   // Unscoped: used by the auth guard, which then checks the user's company.

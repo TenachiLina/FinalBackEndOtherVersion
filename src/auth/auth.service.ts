@@ -37,6 +37,11 @@ export function toAuthUser(user: UserDocument): AuthUser {
   };
 }
 
+/** The signed-in user as the app shows them: who they are, plus their photo. */
+export function toProfile(user: UserDocument) {
+  return { ...toAuthUser(user), photo: user.photo || null };
+}
+
 /** What the frontend needs to know about the company it is working in. */
 export function toCompanyInfo(company: CompanyDocument | null) {
   if (!company) return null;
@@ -122,7 +127,7 @@ export class AuthService {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
       expiresIn: tokens.expiresIn,
-      user: toAuthUser(user),
+      user: toProfile(user),
       company: toCompanyInfo(company),
     };
   }

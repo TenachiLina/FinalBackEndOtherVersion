@@ -14,6 +14,7 @@ export const SkipAudit = () => SetMetadata(SKIP_AUDIT_KEY, true);
 const ACTIONS: Record<string, string> = {
   'POST /auth/login': 'auth.login',
   'POST /auth/change-password': 'auth.changePassword',
+  'PATCH /auth/me': 'auth.updateProfile',
   'POST /auth/logout': 'auth.logout',
   'POST /auth/logout-others': 'auth.logoutOthers',
   'DELETE /auth/sessions/:id': 'session.revoke',

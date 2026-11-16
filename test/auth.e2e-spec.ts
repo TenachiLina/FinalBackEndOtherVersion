@@ -35,6 +35,7 @@ describe('POST /auth/login', () => {
         name: 'Mia',
         role: 'manager',
         companyId: company.id,
+        photo: null,
       },
       company: expect.objectContaining({
         id: company.id,

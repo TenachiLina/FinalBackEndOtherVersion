@@ -12,6 +12,8 @@ export class User {
   @Prop({ required: true, unique: true, lowercase: true, trim: true })
   email!: string;
   @Prop({ required: true, trim: true }) name!: string;
+  // Small picture as a data URL (data:image/png;base64,...), set by the user
+  @Prop() photo?: string;
   // bcrypt hash, never returned by the API
   @Prop({ required: true, select: false }) passwordHash!: string;
   @Prop({

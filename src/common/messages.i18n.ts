@@ -396,6 +396,14 @@ const EXACT: Record<string, Tr> = {
     fr: 'keys doit être une liste de clés de notification',
     ar: 'يجب أن تكون keys قائمة بمفاتيح الإشعارات',
   },
+  'Name must be at most 80 characters': {
+    fr: 'Le nom ne peut pas dépasser 80 caractères',
+    ar: 'يجب ألا يتجاوز الاسم 80 حرفًا',
+  },
+  'The photo must be a PNG, JPEG or WebP image of at most 200 KB': {
+    fr: 'La photo doit être une image PNG, JPEG ou WebP de 200 Ko au maximum',
+    ar: 'يجب أن تكون الصورة بصيغة PNG أو JPEG أو WebP وبحجم 200 كيلوبايت على الأكثر',
+  },
   'empId must be an employee number': {
     fr: "empId doit être un numéro d'employé",
     ar: 'يجب أن يكون empId رقم موظف',
