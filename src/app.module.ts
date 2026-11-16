@@ -49,6 +49,7 @@ import { MeModule } from './me/me.module';
 import { CorrectionsModule } from './corrections/corrections.module';
 import { PayrollModule } from './payroll/payroll.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -88,6 +89,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     CorrectionsModule,
     PayrollModule,
     NotificationsModule,
+    DashboardModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
