@@ -131,8 +131,8 @@ export class NotificationsService {
     );
 
     const href = company.disabledPages.includes('clockinHistory')
-      ? '/clockinpage'
-      : '/clockinpagehistory';
+      ? '/clock-in'
+      : '/clock-in/history';
     const items: NotificationItem[] = [];
     if (missing.length) {
       items.push({
@@ -219,7 +219,7 @@ export class NotificationsService {
         type: 'deviceSilent',
         level: 'danger',
         params: { name: d.name, lastSeenAt: d.lastSeenAt },
-        href: '/clockinpagehistory',
+        href: '/clock-in/history',
       }),
     );
   }

@@ -86,7 +86,7 @@ describe('GET /notifications', () => {
         type: 'missing',
         level: 'danger',
         params: { count: 1, names: ['Amine Bensalah'], day: today() },
-        href: '/clockinpagehistory',
+        href: '/clock-in/history',
         read: false,
       },
     ]);
@@ -159,7 +159,7 @@ describe('GET /notifications', () => {
     });
     await plan(amine);
     expect((await admin.get('/notifications')).body.items[0].href).toBe(
-      '/clockinpage',
+      '/clock-in',
     );
   });
 
@@ -291,7 +291,7 @@ describe("the admin's matters", () => {
         type: 'deviceSilent',
         level: 'danger',
         params: { name: 'Entrance', lastSeenAt: stopped.toISOString() },
-        href: '/clockinpagehistory',
+        href: '/clock-in/history',
         read: false,
       },
     ]);
