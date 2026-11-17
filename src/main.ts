@@ -8,6 +8,7 @@ import { AppLogger } from './error-logs/app-logger';
 import { reportError } from './error-logs/error-reporter';
 import { httpsOptions } from './common/security';
 import { configureApp } from './app.setup';
+import { setupApiDocs } from './health/api-docs';
 
 dns.setServers(['1.1.1.1', '8.8.8.8']);
 
@@ -45,6 +46,8 @@ async function bootstrap() {
   });
 
   configureApp(app);
+  // The API's documentation at /docs (switch off with API_DOCS=off)
+  setupApiDocs(app);
 
   // Render provides the port via process.env.PORT; 0.0.0.0 lets it detect the open port
   const port = process.env.PORT || 3001;

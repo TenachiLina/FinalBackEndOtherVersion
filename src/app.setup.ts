@@ -18,18 +18,30 @@ export function configureApp(app: NestExpressApplication) {
   // Plain HTTP is redirected or refused (except the clocking machine)
   app.use(requireHttps());
   // Security headers: HTTPS only for a year (HSTS), no framing, no MIME
-  // sniffing, no referrer; this API serves no pages, so nothing may load.
-  app.use(
+  // sniffing, no referrer. The API serves no pages, so nothing may load,
+  // except on the documentation page (/docs), which loads its own files.
+  const headers = (scriptsAndStyles: boolean) =>
     helmet({
       contentSecurityPolicy: {
-        directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] },
+        directives: scriptsAndStyles
+          ? {
+              defaultSrc: ["'self'"],
+              styleSrc: ["'self'", "'unsafe-inline'"],
+              imgSrc: ["'self'", 'data:'],
+              frameAncestors: ["'none'"],
+            }
+          : { defaultSrc: ["'none'"], frameAncestors: ["'none'"] },
       },
       strictTransportSecurity: {
         maxAge: 365 * 24 * 60 * 60,
         includeSubDomains: true,
       },
       referrerPolicy: { policy: 'no-referrer' },
-    }),
+    });
+  const apiHeaders = headers(false);
+  const docsHeaders = headers(true);
+  app.use((req: express.Request, res: express.Response, next: express.NextFunction) =>
+    (req.path === '/docs' || req.path.startsWith('/docs/') ? docsHeaders : apiHeaders)(req, res, next),
   );
   app.use(noStore());
   // Room for company logos sent as data URLs

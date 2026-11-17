@@ -1,0 +1,37 @@
+# The API with its own MongoDB, for a server of your own or to try it out.
+#   cp .env.example .env    (set JWT_SECRET and FRONTEND_URL; MONGODB_URI is set below)
+#   docker compose up -d --build
+# The API answers on http://localhost:3001 (put HTTPS in front of it in production:
+# a reverse proxy such as Caddy or Nginx, and set TRUST_PROXY=1).
+
+services:
+  api:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/nexo
+      NODE_ENV: production
+      # Behind a reverse proxy that does HTTPS
+      TRUST_PROXY: "1"
+    ports:
+      - "3001:3001"
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  mongo:
+    image: mongo:7.0
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+      # Backups made with the commands in docs/OPERATIONS.md land here
+      - ./backups:/backups
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  mongo-data:

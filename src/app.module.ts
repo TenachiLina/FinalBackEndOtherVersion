@@ -50,6 +50,7 @@ import { CorrectionsModule } from './corrections/corrections.module';
 import { PayrollModule } from './payroll/payroll.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { HealthController } from './health/health.controller';
 
 @Module({
   imports: [
@@ -91,6 +92,8 @@ import { DashboardModule } from './dashboard/dashboard.module';
     NotificationsModule,
     DashboardModule,
   ],
+  // Health check: GET /health (and GET /)
+  controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

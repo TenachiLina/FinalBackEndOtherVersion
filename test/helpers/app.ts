@@ -19,7 +19,9 @@ let dbCounter = 0;
  * Starts the real app (AppModule + configureApp, as in main.ts) on its own
  * database in the shared test MongoDB. Call once per file in beforeAll.
  */
-export async function createTestApp(): Promise<TestApp> {
+export async function createTestApp(
+  options: { beforeInit?: (app: NestExpressApplication) => unknown } = {},
+): Promise<TestApp> {
   const base = process.env.MONGO_TEST_URI;
   if (!base) throw new Error('MONGO_TEST_URI not set: run through jest');
   const dbName = `t${process.env.JEST_WORKER_ID ?? 0}_${Date.now()}_${dbCounter++}`;
@@ -36,6 +38,7 @@ export async function createTestApp(): Promise<TestApp> {
     logger: false,
   });
   configureApp(app);
+  options.beforeInit?.(app);
   await app.init();
 
   const connection = app.get<Connection>(getConnectionToken());

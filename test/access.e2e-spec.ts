@@ -254,9 +254,11 @@ describe('the rules for sensitive routes', () => {
     }
   });
 
-  it('only sign-in, branding and the clocking machine are public', () => {
+  it('only sign-in, branding, the health check and the clocking machine are public', () => {
     expect(routes.filter((r) => r.isPublic).map((r) => r.key)).toEqual([
+      'GET /',
       'GET /branding/:slug',
+      'GET /health',
       'GET /iclock/cdata/cdata.aspx',
       'GET /iclock/getrequest/getrequest.aspx',
       'GET /iclock/ping/ping.aspx',
